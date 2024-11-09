@@ -1,7 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2021-23 Tskit Developers
-# Copyright (c) 2020-21 University of Oxford
+# Copyright (c) 2024 Tskit Developers
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +25,7 @@ Test tools for mapping between node sets of different tree sequences
 """
 
 from collections import defaultdict
+from itertools import combinations
 
 import msprime
 import numpy as np
@@ -55,7 +55,7 @@ true_ext = true_simpl.extend_haplotypes()
 def naive_shared_node_spans(ts, other):
     """
     Inefficient but transparent function to get span where nodes from two tree
-    sequences subtend the same sample set (also found in tsdate/tests)
+    sequences subtend the same sample set
     """
 
     def _clade_dict(tree):
@@ -126,13 +126,96 @@ def naive_dissimilarity(ts, other, transform=None):
     node_span = naive_node_span(ts)
     total_node_spans = np.sum(node_span)
     total_other_spans = np.sum(naive_node_span(other))
-    dissimilarity = 1 - np.sum(best_match_spans) / total_node_spans
-    true_prop = np.sum(best_match_spans) / total_other_spans
+    match_span = np.sum(best_match_spans)
     rmse = np.sqrt(np.sum(node_span * time_discrepancies**2) / total_node_spans)
-    return dissimilarity, true_prop, rmse
+    return match_span, total_node_spans, total_other_spans, rmse
+
+
+@pytest.mark.parametrize("ts", [true_unary, true_simpl])
+class TestCladeMap:
+    def test_map(self, ts):
+        """
+        test that clade map has correct nodes, clades
+        """
+        clade_map = tscompare.CladeMap(ts)
+        for tree in ts.trees():
+            for node in tree.nodes():
+                clade = frozenset(tree.samples(node))
+                assert node in clade_map._nodes[clade]
+                assert clade_map._clades[node] == clade
+            clade_map.next()
+
+    def test_diff(self, ts):
+        """
+        test difference in clades between adjacent trees.
+        """
+        clade_map = tscompare.CladeMap(ts)
+        tree_1 = ts.first()
+        tree_2 = ts.first()
+        while True:
+            tree_2.next()
+            diff = clade_map.next()
+            diff_test = {}
+            for n in set(tree_1.nodes()) | set(tree_2.nodes()):
+                prev = frozenset(tree_1.samples(n))
+                curr = frozenset(tree_2.samples(n))
+                if prev != curr:
+                    diff_test[n] = (prev, curr)
+            for node in diff_test.keys() | diff.keys():
+                assert diff_test[node][0] == diff[node][0]
+                assert diff_test[node][1] == diff[node][1]
+            if tree_2.index == ts.num_trees - 1:
+                break
+            tree_1.next()
 
 
 class TestNodeMatching:
+
+    @pytest.mark.parametrize(
+        "ts",
+        [true_simpl, true_unary],
+    )
+    def test_node_spans(self, ts):
+        eval_ns = tscompare.node_spans(ts)
+        naive_ns = naive_node_span(ts)
+        assert np.allclose(eval_ns, naive_ns)
+
+    @pytest.mark.parametrize(
+        "pair", combinations([true_simpl, true_unary], 2)
+    )
+    def test_shared_spans(self, pair):
+        """
+        Check that efficient implementation returns same answer as naive
+        implementation
+        """
+        check = naive_shared_node_spans(pair[0], pair[1])
+        test = tscompare.shared_node_spans(pair[0], pair[1])
+        assert check.shape == test.shape
+        assert check.nnz == test.nnz
+        assert np.allclose(check.data, test.data)
+
+    @pytest.mark.parametrize("ts", [true_simpl])
+    def test_match_self(self, ts):
+        """
+        Check that matching against self returns node ids
+
+        TODO: this'll only work reliably when there's not unary nodes.
+        """
+        time, _, hit = tscompare.match_node_ages(ts, ts)
+        assert np.allclose(time, ts.nodes_time)
+        assert np.array_equal(hit, np.arange(ts.num_nodes))
+
+class TestDissimilarity:
+
+    def verify_dissimilarity(self, ts, other, transform=None):
+        match_span, ts_span, other_span, rmse = naive_dissimilarity(ts, other, transform=transform)
+        dis = tscompare.dissimilarity(ts, other, transform=transform)
+        assert np.isclose(1.0 - match_span/ts_span, dis.relative_dissimilarity)
+        assert np.isclose(match_span/other_span, dis.relative_similarity)
+        assert np.isclose(ts_span - match_span, dis.dissimilarity)
+        assert np.isclose(ts_span, dis.total_span[0])
+        assert np.isclose(other_span, dis.total_span[1])
+        assert np.isclose(rmse, dis.rmse)
 
     @pytest.mark.parametrize(
         "pair",
@@ -143,11 +226,7 @@ class TestNodeMatching:
         Check that efficient implementation reutrns the same answer as naive
         implementation.
         """
-        check_dis, check_prop, check_rmse = naive_dissimilarity(pair[0], pair[1])
-        dis = tscompare.dissimilarity(pair[0], pair[1])
-        assert np.isclose(check_dis, dis.dissimilarity)
-        assert np.isclose(check_prop, dis.prop_represented)
-        assert np.isclose(check_rmse, dis.rmse)
+        self.verify_dissimilarity(pair[0], pair[1])
 
     @pytest.mark.parametrize(
         "pair",
@@ -156,12 +235,15 @@ class TestNodeMatching:
     def test_zero_dissimilarity(self, pair):
         dis = tscompare.dissimilarity(pair[0], pair[1])
         assert np.isclose(dis.dissimilarity, 0)
-        assert dis.prop_represented >= 0
+        assert np.isclose(dis.relative_dissimilarity,  0)
         assert np.isclose(dis.rmse, 0)
 
     def test_transform(self):
-        dis = tscompare.dissimilarity(true_simpl, true_simpl, transform=lambda x: x)
-        assert np.isclose(dis.rmse, 0)
+        dis1 = tscompare.dissimilarity(true_simpl, true_simpl, transform=lambda t: t)
+        dis2 = tscompare.dissimilarity(true_simpl, true_simpl, transform=None)
+        assert dis1.dissimilarity == dis2.dissimilarity
+        assert dis1.rmse == dis2.rmse
+        self.verify_dissimilarity(true_simpl, true_ext, transform=lambda t: 1/(1 + t))
 
     def get_simple_ts(self, samples=None, time=False, span=False, no_match=False):
         # A simple tree sequence we can use to properly test various
@@ -295,34 +377,50 @@ class TestNodeMatching:
             assert ts.num_edges == 14
         return ts
 
+    def test_dissimilarity_and_naive_dissimilarity_with_no_match(self):
+        ts = self.get_simple_ts()
+        other = self.get_simple_ts(span=True, time=True, no_match=True)
+        self.verify_dissimilarity(ts, other)
+        self.verify_dissimilarity(ts, other, transform=lambda t: np.sqrt(1 + t))
+
     def test_dissimilarity_value(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True)
         dis = tscompare.dissimilarity(ts, other)
-        assert np.isclose(dis.dissimilarity, 4 / 46)
+        assert np.isclose(dis.relative_dissimilarity, 4 / 46)
         assert np.isclose(dis.rmse, 0.0)
 
     def test_dissimilarity_rmse(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(time=True)
         dis = tscompare.dissimilarity(ts, other)
-        true_error = np.sqrt((2 * 6 * 300**2 + 2 * 2 * 150**2) / 46)
+        true_total_span = 46
+        assert dis.total_span[0] == true_total_span
+        assert dis.total_span[1] == true_total_span
+        def f(t):
+            return np.log(1 + t)
+        true_rmse = np.sqrt((
+            2 * 6 * (f(500) - f(200))**2 # nodes 4, 5
+            + 2 * 2 * (f(750) - f(600))**2 # nodes, 7, 8
+        ) / true_total_span)
+        assert np.isclose(dis.relative_dissimilarity, 0.0)
+        assert np.isclose(dis.relative_similarity, 1.0)
         assert np.isclose(dis.dissimilarity, 0.0)
-        assert np.isclose(dis.rmse, true_error)
+        assert np.isclose(dis.rmse, true_rmse)
 
     def test_dissimilarity_value_and_error(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True, time=True)
         dis = tscompare.dissimilarity(ts, other)
-        true_error = np.sqrt((2 * 6 * 300**2 + 2 * 2 * 150**2) / 46)
-        assert np.isclose(dis.dissimilarity, 4 / 46)
-        assert np.isclose(dis.rmse, true_error)
-
-    def test_dissimilarity_and_naive_dissimilarity_with_no_match(self):
-        ts = self.get_simple_ts()
-        other = self.get_simple_ts(span=True, time=True, no_match=True)
-        check_dis, check_prop, check_rmse = naive_dissimilarity(ts, other)
-        dis = tscompare.dissimilarity(ts, other)
-        assert np.isclose(check_dis, dis.dissimilarity)
-        assert np.isclose(check_prop, dis.prop_represented)
-        assert np.isclose(check_rmse, dis.rmse)
+        true_total_spans = (46, 47)
+        assert dis.total_span == true_total_spans
+        def f(t):
+            return np.log(1 + t)
+        true_rmse = np.sqrt((
+            2 * 6 * (f(500) - f(200))**2 # nodes 4, 5
+            + 2 * 2 * (f(750) - f(600))**2 # nodes, 7, 8
+        ) / true_total_spans[0])
+        assert np.isclose(dis.relative_dissimilarity, 4 / true_total_spans[0])
+        assert np.isclose(dis.relative_similarity, (true_total_spans[0] - 4) / true_total_spans[1])
+        assert np.isclose(dis.dissimilarity, 4)
+        assert np.isclose(dis.rmse, true_rmse)

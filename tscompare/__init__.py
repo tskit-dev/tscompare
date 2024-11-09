@@ -22,4 +22,4 @@
 """
 Tools for comparing tree sequences
 """
-from .methods import dissimiliarity
+from .methods import dissimilarity, node_spans, CladeMap, shared_node_spans, match_node_ages, DissimilarityResult
