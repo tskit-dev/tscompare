@@ -36,8 +36,9 @@ import tskit
 def node_spans(ts):
     """
     Returns the array of "node spans", i.e., the `j`th entry gives
-    the total span over which node `j` is in the tree (i.e., does
-    not have 'missing data' there).
+    the total span over which node `j` is in the tree sequence
+    (i.e., does not have 'missing data' there).
+
     """
     child_spans = np.bincount(
         ts.edges_child,
@@ -168,10 +169,14 @@ class CladeMap:
 def shared_node_spans(ts, other):
     """
     Calculate the spans over which pairs of nodes in two tree sequences are
-    ancestral to indentical sets of samples.
+    ancestral to identical sets of samples.
+
 
     Returns a sparse matrix where rows correspond to nodes in `ts` and columns
-    correspond to nodes in `other`.
+    correspond to nodes in `other`, and whose value is the total amount of span
+    over which the set of samples inheriting from the two nodes is identical.
+
+    :return: A sparse matrix of class `scipy.sparse.csr_matrix`.
     """
 
     if ts.sequence_length != other.sequence_length:
@@ -250,17 +255,17 @@ def shared_node_spans(ts, other):
 def match_node_ages(ts, other):
     """
     For each node in `ts`, return the age of a matched node from `other`.  Node
-    matching is accomplished by calculating the intervals over which pairs of
-    nodes (one from `ts`, one from `other`) subtend the same set of samples.
+    matching is accomplished as described in :func:`.compare`.
+    
 
-    Returns three vectors of length `ts.num_nodes`: the age of the best
-    matching node in `other` (e.g.  with the longest shared span); the
-    proportion of the node span in `ts` that is covered by the best match; and
-    the id of the best match in `other`.
+    Returns a tuple of three vectors of length `ts.num_nodes`, in this order: 
+    the age of the best matching node in `other`;
+    the proportion of the node span in `ts` that is covered by the best match;
+    and the node id of the best match in `other`.
 
-    If either tree sequence contains unary nodes, then there may be multiple
-    matches with the same span for a single node. In this case, the returned
-    match is the node with the smallest integer id.
+
+:return: A tuple of arrays of length `ts.num_nodes` containing
+    (time of matching node, proportion overlap, and node ID of match).
     """
 
     shared_spans = shared_node_spans(ts, other)
@@ -277,33 +282,46 @@ def match_node_ages(ts, other):
 
 
 @dataclass
-class DissimilarityResult:
+class ARFResult:
+
     """
-    The result of a call to tscompare.dissimilarity(ts, other).
+    The result of a call to tscompare.compare(ts, other),
+    returning metrics associated with the ARG Robinson-Foulds
+    measures of similarity and dissimilarity.
+
     """
-    relative_dissimilarity: float
+    arf: float
+
     """
-    The proportion of the total span of ts that is *not* represented in other.
+    The ARG Robinson-Foulds relative dissimilarity:
+    the proportion of the total span of `ts` that is *not* represented in `other`.
+
     This is: dissimilarity / total_span[0]
     """
-    relative_similarity: float
+    tpr: float
+
     """
-    The proportion of the total span of other that is represented in ts.
+    The "true proportion represented":
+    the proportion of the total span of `other` that is represented in `ts`.
+
     This is: (total_span[0] - dissimilarity) / total_span[1]
     """
     dissimilarity: float
     """
-    The total span of ts that is not represented in other.
+    The total span of `ts` that is not represented in `other`.
+
     """
     total_span: tuple
     """
-    The total spans of the two tree sequences, in order (ts, other).
+    The total of all node spans of the two tree sequences, in order (`ts`, `other`).
+
     """
     rmse: float
     """
     The root-mean-squared error between the transformed times of the nodes in
-    ts and the transformed times of their best-matching nodes in other, with
-    the average taken weighting by span
+    `ts` and the transformed times of their best-matching nodes in `other`, with
+    the average taken weighting by span in `ts`.
+
     """
     transform: callable
     """
@@ -313,35 +331,51 @@ class DissimilarityResult:
 
 
 
-def dissimilarity(ts, other, transform=None):
+def compare(ts, other, transform=None):
+
     """
     For two tree sequences `ts` and `other`,
-    this method returns three values:
-    1. The fraction of the total span of `ts` over which each nodes' descendant
-    sample set does not match its' best match's descendant sample set.
-    2. The root mean squared difference
+    this method returns an object of type :class:`.ARFResult`.
+    The values reported summarize the degree to which nodes in `ts`
+    "match" corresponding nodes in `other`.
+    
+    To match nodes,
+    for each node in `ts`, the best matching node(s) from `other`
+    has the longest matching span using :func:`.shared_node_spans`.
+    If there are multiple matches with the same longest shared span
+    for a single node, the best match is the match that is closest in time.
+    
+    Then, :class:`.ARFResult` contains:
+    1. The total "matching span", which is the total span of all nodes
+    in `ts` over which each node is ancestral to the same set of samples
+    as its best match in `other`.
+    2. (`arf`) The fraction of the total span of `ts` over which each nodes' 
+    descendant sample set does not match its' best match's descendant 
+    sample set (i.e., the total *un*-matched span divided by the total
+    span of `ts`).
+    3. (`tpr`) The proportion of the span in `other` that is correctly
+    represented in `ts` (i.e., the total matching span divided
+    by the total span of `other`).
+    4. The root mean squared difference
     between the transformed times of the nodes in `ts`
     and transformed times of their best matching nodes in `other`,
     with the average weighted by the nodes' spans in `ts`.
-    3. The proportion of the span in `other` that is correctly
-    represented in `ts` (i.e., the total matching span divided
-    by the total span of `other`).
+    5. The total node spans of `ts` and `other`.
 
-    The transformation for times is by default log(1 + t).
 
-    This is done as follows:
 
-    For each node in `ts`, the best matching node(s) from `other`
-    has the longest matching span using `shared_node_spans`.
-    If there are multiple matches with the same longest shared span
-    for a single node, the best match is the match that is closest in time.
+    `transform` is used to transform times before computing root-mean-squared error
+    (see :class:`.ARFResult`); the default is `log(1 + t)`.
+
 
     :param ts: The focal tree sequence.
-    :param other: The tree sequence we check for inclusion in.
+    :param other: The tree sequence we compare to.
+
     :param transform: A callable that can take an array of times and
         return another array of numbers.
     :return: The three quantities above.
-    :rtype: DissimilarityResult
+    :rtype: ARFResult
+
     """
 
     if transform is None:
@@ -394,9 +428,11 @@ def dissimilarity(ts, other, transform=None):
     )
     product = np.multiply((time_discrepancies**2), ts_node_spans)
     rmse = np.sqrt(np.sum(product) / total_span_ts)
-    return DissimilarityResult(
-            relative_dissimilarity = 1.0 - total_match_span / total_span_ts,
-            relative_similarity = total_match_span / total_span_other,
+    return ARFResult(
+
+            arf = 1.0 - total_match_span / total_span_ts,
+            tpr = total_match_span / total_span_other,
+
             dissimilarity = total_span_ts - total_match_span,
             total_span = (total_span_ts, total_span_other),
             rmse = rmse,
