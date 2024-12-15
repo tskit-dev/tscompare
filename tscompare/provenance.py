@@ -19,8 +19,17 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""
-Tools for comparing tree sequences
-"""
-from .methods import compare, node_spans, CladeMap, shared_node_spans, match_node_ages, ARFResult
-from .provenance import __version__
+
+__version__ = "undefined"
+try:
+    from . import _version
+
+    __version__ = _version.version
+except ImportError:  # pragma: nocover
+    try:
+        from setuptools_scm import get_version
+
+        __version__ = get_version(root="..", relative_to=__file__)
+    except ImportError:
+        pass
+

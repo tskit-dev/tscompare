@@ -288,47 +288,50 @@ class ARFResult:
     The result of a call to tscompare.compare(ts, other),
     returning metrics associated with the ARG Robinson-Foulds
     measures of similarity and dissimilarity.
+    This contains:
 
+    `arf`:
+        The ARG Robinson-Foulds relative dissimilarity:
+        the proportion of the total span of `ts` that is *not* represented in `other`.
+        This is: `dissimilarity / total_span[0]`
+
+    `tpr`:
+        The "true proportion represented":
+        the proportion of the total span of `other` that is represented in `ts`.
+        This is: `(total_span[0] - dissimilarity) / total_span[1]`
+
+    `dissimilarity`:
+        The total span of `ts` that is not represented in `other`.
+    
+    `total_span`:
+        The total of all node spans of the two tree sequences, in order (`ts`, `other`).
+
+    `rmse`:
+        The root-mean-squared error between the transformed times of the nodes in
+        `ts` and the transformed times of their best-matching nodes in `other`, with
+        the average taken weighting by span in `ts`.
+
+    `transform`:
+        The transformation function used to transform times for computing `rmse`.
     """
     arf: float
-
-    """
-    The ARG Robinson-Foulds relative dissimilarity:
-    the proportion of the total span of `ts` that is *not* represented in `other`.
-
-    This is: dissimilarity / total_span[0]
-    """
     tpr: float
-
-    """
-    The "true proportion represented":
-    the proportion of the total span of `other` that is represented in `ts`.
-
-    This is: (total_span[0] - dissimilarity) / total_span[1]
-    """
     dissimilarity: float
-    """
-    The total span of `ts` that is not represented in `other`.
-
-    """
     total_span: tuple
-    """
-    The total of all node spans of the two tree sequences, in order (`ts`, `other`).
-
-    """
     rmse: float
-    """
-    The root-mean-squared error between the transformed times of the nodes in
-    `ts` and the transformed times of their best-matching nodes in `other`, with
-    the average taken weighting by span in `ts`.
-
-    """
     transform: callable
-    """
-    The transformation function used to transform times for computing `rmse`.
-    """
 
-
+    def __str__(self):
+        """
+        Return a plain text summary of the ARF result.
+        """
+        out = "Tree sequence comparison:\n"
+        out += f"    ARF: {100*self.arf:.2f}%\n"
+        out += f"    TPR: {100*self.tpr:.2f}%\n"
+        out += f"    dissimilarity: {self.dissimilarity}\n"
+        out += f"    total span (ts, other): {self.total_span[0]}, {self.total_span[1]}\n"
+        out += f"    time RMSE: {self.rmse}\n"
+        return out
 
 
 def compare(ts, other, transform=None):
@@ -346,36 +349,42 @@ def compare(ts, other, transform=None):
     for a single node, the best match is the match that is closest in time.
     
     Then, :class:`.ARFResult` contains:
-    1. The total "matching span", which is the total span of all nodes
-    in `ts` over which each node is ancestral to the same set of samples
-    as its best match in `other`.
-    2. (`arf`) The fraction of the total span of `ts` over which each nodes' 
-    descendant sample set does not match its' best match's descendant 
-    sample set (i.e., the total *un*-matched span divided by the total
-    span of `ts`).
-    3. (`tpr`) The proportion of the span in `other` that is correctly
-    represented in `ts` (i.e., the total matching span divided
-    by the total span of `other`).
-    4. The root mean squared difference
-    between the transformed times of the nodes in `ts`
-    and transformed times of their best matching nodes in `other`,
-    with the average weighted by the nodes' spans in `ts`.
-    5. The total node spans of `ts` and `other`.
 
+    - (`dissimilarity`)
+        The total "matching span", which is the total span of
+        all nodes in `ts` over which each node is ancestral to the same set of
+        samples as its best match in `other`.
 
+    - (`arf`)
+        The fraction of the total span of `ts` over which each nodes' 
+        descendant sample set does not match its' best match's descendant 
+        sample set (i.e., the total *un*-matched span divided by the total
+        span of `ts`).
 
-    `transform` is used to transform times before computing root-mean-squared error
-    (see :class:`.ARFResult`); the default is `log(1 + t)`.
+    - (`tpr`)
+        The proportion of the span in `other` that is correctly
+        represented in `ts` (i.e., the total matching span divided
+        by the total span of `other`).
 
+    - (`rmse`)
+        The root mean squared difference
+        between the transformed times of the nodes in `ts`
+        and transformed times of their best matching nodes in `other`,
+        with the average weighted by the nodes' spans in `ts`.
+
+    - (`total_spans`)
+        The total node spans of `ts` and `other`.
+
+    The callable `transform` is used to transform times before computing
+    root-mean-squared error (see :class:`.ARFResult`); the default
+    is `log(1 + t)`.
 
     :param ts: The focal tree sequence.
     :param other: The tree sequence we compare to.
-
     :param transform: A callable that can take an array of times and
         return another array of numbers.
     :return: The three quantities above.
     :rtype: ARFResult
-
     """
 
     if transform is None:
