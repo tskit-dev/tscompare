@@ -94,7 +94,7 @@ def naive_node_span(ts):
     return node_spans
 
 
-def naive_dissimilarity(ts, other, transform=None):
+def naive_compare(ts, other, transform=None):
     """
     Ineffiecient but transparent function to compute dissimilarity
     and root-mean-square-error between two tree sequences.
@@ -207,11 +207,11 @@ class TestNodeMatching:
 
 class TestDissimilarity:
 
-    def verify_dissimilarity(self, ts, other, transform=None):
-        match_span, ts_span, other_span, rmse = naive_dissimilarity(ts, other, transform=transform)
-        dis = tscompare.dissimilarity(ts, other, transform=transform)
-        assert np.isclose(1.0 - match_span/ts_span, dis.relative_dissimilarity)
-        assert np.isclose(match_span/other_span, dis.relative_similarity)
+    def verify_compare(self, ts, other, transform=None):
+        match_span, ts_span, other_span, rmse = naive_compare(ts, other, transform=transform)
+        dis = tscompare.compare(ts, other, transform=transform)
+        assert np.isclose(1.0 - match_span/ts_span, dis.arf)
+        assert np.isclose(match_span/other_span, dis.tpr)
         assert np.isclose(ts_span - match_span, dis.dissimilarity)
         assert np.isclose(ts_span, dis.total_span[0])
         assert np.isclose(other_span, dis.total_span[1])
@@ -221,29 +221,29 @@ class TestDissimilarity:
         "pair",
         [(true_ext, true_ext), (true_simpl, true_ext), (true_simpl, true_unary)],
     )
-    def test_basic_dissimilarity(self, pair):
+    def test_basic_comparison(self, pair):
         """
         Check that efficient implementation reutrns the same answer as naive
         implementation.
         """
-        self.verify_dissimilarity(pair[0], pair[1])
+        self.verify_compare(pair[0], pair[1])
 
     @pytest.mark.parametrize(
         "pair",
         [(true_ext, true_ext), (true_simpl, true_ext), (true_simpl, true_unary)],
     )
     def test_zero_dissimilarity(self, pair):
-        dis = tscompare.dissimilarity(pair[0], pair[1])
+        dis = tscompare.compare(pair[0], pair[1])
         assert np.isclose(dis.dissimilarity, 0)
-        assert np.isclose(dis.relative_dissimilarity,  0)
+        assert np.isclose(dis.arf,  0)
         assert np.isclose(dis.rmse, 0)
 
     def test_transform(self):
-        dis1 = tscompare.dissimilarity(true_simpl, true_simpl, transform=lambda t: t)
-        dis2 = tscompare.dissimilarity(true_simpl, true_simpl, transform=None)
+        dis1 = tscompare.compare(true_simpl, true_simpl, transform=lambda t: t)
+        dis2 = tscompare.compare(true_simpl, true_simpl, transform=None)
         assert dis1.dissimilarity == dis2.dissimilarity
         assert dis1.rmse == dis2.rmse
-        self.verify_dissimilarity(true_simpl, true_ext, transform=lambda t: 1/(1 + t))
+        self.verify_compare(true_simpl, true_ext, transform=lambda t: 1/(1 + t))
 
     def get_simple_ts(self, samples=None, time=False, span=False, no_match=False):
         # A simple tree sequence we can use to properly test various
@@ -377,23 +377,23 @@ class TestDissimilarity:
             assert ts.num_edges == 14
         return ts
 
-    def test_dissimilarity_and_naive_dissimilarity_with_no_match(self):
+    def test_with_no_match(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True, time=True, no_match=True)
-        self.verify_dissimilarity(ts, other)
-        self.verify_dissimilarity(ts, other, transform=lambda t: np.sqrt(1 + t))
+        self.verify_compare(ts, other)
+        self.verify_compare(ts, other, transform=lambda t: np.sqrt(1 + t))
 
     def test_dissimilarity_value(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True)
-        dis = tscompare.dissimilarity(ts, other)
-        assert np.isclose(dis.relative_dissimilarity, 4 / 46)
+        dis = tscompare.compare(ts, other)
+        assert np.isclose(dis.arf, 4 / 46)
         assert np.isclose(dis.rmse, 0.0)
 
-    def test_dissimilarity_rmse(self):
+    def test_rmse(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(time=True)
-        dis = tscompare.dissimilarity(ts, other)
+        dis = tscompare.compare(ts, other)
         true_total_span = 46
         assert dis.total_span[0] == true_total_span
         assert dis.total_span[1] == true_total_span
@@ -403,15 +403,15 @@ class TestDissimilarity:
             2 * 6 * (f(500) - f(200))**2 # nodes 4, 5
             + 2 * 2 * (f(750) - f(600))**2 # nodes, 7, 8
         ) / true_total_span)
-        assert np.isclose(dis.relative_dissimilarity, 0.0)
-        assert np.isclose(dis.relative_similarity, 1.0)
+        assert np.isclose(dis.arf, 0.0)
+        assert np.isclose(dis.tpr, 1.0)
         assert np.isclose(dis.dissimilarity, 0.0)
         assert np.isclose(dis.rmse, true_rmse)
 
-    def test_dissimilarity_value_and_error(self):
+    def test_value_and_error(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True, time=True)
-        dis = tscompare.dissimilarity(ts, other)
+        dis = tscompare.compare(ts, other)
         true_total_spans = (46, 47)
         assert dis.total_span == true_total_spans
         def f(t):
@@ -420,7 +420,7 @@ class TestDissimilarity:
             2 * 6 * (f(500) - f(200))**2 # nodes 4, 5
             + 2 * 2 * (f(750) - f(600))**2 # nodes, 7, 8
         ) / true_total_spans[0])
-        assert np.isclose(dis.relative_dissimilarity, 4 / true_total_spans[0])
-        assert np.isclose(dis.relative_similarity, (true_total_spans[0] - 4) / true_total_spans[1])
+        assert np.isclose(dis.arf, 4 / true_total_spans[0])
+        assert np.isclose(dis.tpr, (true_total_spans[0] - 4) / true_total_spans[1])
         assert np.isclose(dis.dissimilarity, 4)
         assert np.isclose(dis.rmse, true_rmse)
