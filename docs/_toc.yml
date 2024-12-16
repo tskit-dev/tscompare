@@ -1,0 +1,9 @@
+format: jb-book
+root: intro
+parts:
+- caption: Using tscompare
+  chapters:
+  - file: usage
+  - file: api
+  - file: CITATION
+  - file: CHANGELOG

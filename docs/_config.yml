@@ -1,0 +1,75 @@
+# Book settings
+# Learn more at https://jupyterbook.org/customize/config.html
+
+title: tscompare manual
+author: Tskit Developers
+copyright: "2024"
+only_build_toc_files: true
+logo: logo.svg
+
+execute:
+  execute_notebooks: cache
+
+launch_buttons:
+  binderhub_url: ""
+
+repository:
+  url: https://github.com/tskit-dev/tscompare
+  branch: main
+  path_to_book: docs
+
+html:
+  use_issues_button: true
+  use_repository_button: true
+  use_edit_page_button: true
+  # Do not edit this - the version placeholder is replaced by the
+  # current version during a distribution build in the Makefile
+  extra_footer: |
+    <div>
+    tscompare __TSCOMPARE_VERSION__
+    </div>
+
+sphinx:
+    extra_extensions:
+    - sphinx.ext.autodoc
+    - sphinx.ext.autosummary
+    - sphinx.ext.todo
+    - sphinx.ext.viewcode
+    - sphinx.ext.intersphinx
+    - sphinx_issues
+    - sphinxarg.ext
+    - IPython.sphinxext.ipython_console_highlighting
+
+    config:
+      html_theme: sphinx_book_theme
+      html_theme_options:
+        navigation_with_keys: False
+        pygments_dark_style: monokai
+      myst_enable_extensions:
+      - colon_fence
+      - deflist
+      - substitution
+      issues_github_path: tskit-dev/tscompare
+      todo_include_todos: true
+      intersphinx_mapping:
+        python: ["https://docs.python.org/3/", null]
+        tskit: ["https://tskit.dev/tskit/docs/stable", null]
+        tutorials: ["https://tskit.dev/tutorials/", null]
+        stdpopsim: ["https://popsim-consortium.github.io/stdpopsim-docs/stable", null]
+        pyslim: ["https://tskit.dev/pyslim/docs/latest/", null]
+        numpy: ["https://numpy.org/doc/stable/", null]
+        demes: ["https://popsim-consortium.github.io/demes-docs/main/", null]
+        demes-spec: ["https://popsim-consortium.github.io/demes-spec-docs/main/", null]
+      nitpicky: true
+
+      autodoc_member_order: bysource
+
+      # Without this option, autodoc tries to put links for all return types
+      # in terms of the fully-qualified classnames
+      # (e.g. msprime.demography.Demography) which we don't want, and also
+      # leads to broken links and nitpick failures. So, until we tackle
+      # typehints fully, this is the simplest approach.
+      autodoc_typehints: none
+
+      myst_substitutions:
+        min_python_version: "3.8"

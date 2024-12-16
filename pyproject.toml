@@ -1,0 +1,32 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "setuptools_scm",
+    "wheel",
+    "oldest-supported-numpy"
+]
+
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "tscompare/_version.py"
+
+[project]
+name = "tscompare"
+version = "0.1"
+authors = [
+  { name="Tskit Developers", email="admin@tskit.dev" },
+]
+description = "Tools for comparing tree sequences."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://tskit.dev/tscompare"
+Issues = "https://github.com/tskit-dev/tscompare/issues"
+
