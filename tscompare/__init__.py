@@ -22,5 +22,10 @@
 """
 Tools for comparing tree sequences
 """
-from .methods import compare, node_spans, CladeMap, shared_node_spans, match_node_ages, ARFResult
-from .provenance import __version__
+from .methods import ARFResult  # noqa F401
+from .methods import CladeMap  # noqa F401
+from .methods import compare  # noqa F401
+from .methods import match_node_ages  # noqa F401
+from .methods import node_spans  # noqa F401
+from .methods import shared_node_spans  # noqa F401
+from .provenance import __version__  # noqa F401

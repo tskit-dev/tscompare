@@ -32,4 +32,3 @@ except ImportError:  # pragma: nocover
         __version__ = get_version(root="..", relative_to=__file__)
     except ImportError:
         pass
-

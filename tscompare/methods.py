@@ -22,16 +22,15 @@
 """
 Tools for comparing node times between tree sequences with different node sets
 """
-
-from dataclasses import dataclass
-from collections import defaultdict
-from itertools import groupby, product
-
 import copy
+from collections import defaultdict
+from dataclasses import dataclass
+from itertools import product
+
 import numpy as np
 import scipy.sparse
-
 import tskit
+
 
 def node_spans(ts):
     """
@@ -97,7 +96,7 @@ class CladeMap:
             node = self.tree.parent(node)
         return nodes
 
-    def next(self):
+    def next(self):  # noqa: A003
         """
         Advance to the next tree, returning the difference between trees as a
         dictionary of the form `node : (last_clade, next_clade)`
@@ -254,18 +253,18 @@ def shared_node_spans(ts, other):
 
 def match_node_ages(ts, other):
     """
-    For each node in `ts`, return the age of a matched node from `other`.  Node
-    matching is accomplished as described in :func:`.compare`.
-    
-
-    Returns a tuple of three vectors of length `ts.num_nodes`, in this order: 
-    the age of the best matching node in `other`;
-    the proportion of the node span in `ts` that is covered by the best match;
-    and the node id of the best match in `other`.
+        For each node in `ts`, return the age of a matched node from `other`.  Node
+        matching is accomplished as described in :func:`.compare`.
 
 
-:return: A tuple of arrays of length `ts.num_nodes` containing
-    (time of matching node, proportion overlap, and node ID of match).
+        Returns a tuple of three vectors of length `ts.num_nodes`, in this order:
+        the age of the best matching node in `other`;
+        the proportion of the node span in `ts` that is covered by the best match;
+        and the node id of the best match in `other`.
+
+
+    :return: A tuple of arrays of length `ts.num_nodes` containing
+        (time of matching node, proportion overlap, and node ID of match).
     """
 
     shared_spans = shared_node_spans(ts, other)
@@ -283,7 +282,6 @@ def match_node_ages(ts, other):
 
 @dataclass
 class ARFResult:
-
     """
     The result of a call to tscompare.compare(ts, other),
     returning metrics associated with the ARG Robinson-Foulds
@@ -302,7 +300,7 @@ class ARFResult:
 
     `dissimilarity`:
         The total span of `ts` that is not represented in `other`.
-    
+
     `total_span`:
         The total of all node spans of the two tree sequences, in order (`ts`, `other`).
 
@@ -314,6 +312,7 @@ class ARFResult:
     `transform`:
         The transformation function used to transform times for computing `rmse`.
     """
+
     arf: float
     tpr: float
     dissimilarity: float
@@ -326,28 +325,29 @@ class ARFResult:
         Return a plain text summary of the ARF result.
         """
         out = "Tree sequence comparison:\n"
-        out += f"    ARF: {100*self.arf:.2f}%\n"
-        out += f"    TPR: {100*self.tpr:.2f}%\n"
+        out += f"    ARF: {100 * self.arf:.2f}%\n"
+        out += f"    TPR: {100 * self.tpr:.2f}%\n"
         out += f"    dissimilarity: {self.dissimilarity}\n"
-        out += f"    total span (ts, other): {self.total_span[0]}, {self.total_span[1]}\n"
+        out += (
+            f"    total span (ts, other): {self.total_span[0]}, {self.total_span[1]}\n"
+        )
         out += f"    time RMSE: {self.rmse}\n"
         return out
 
 
 def compare(ts, other, transform=None):
-
     """
     For two tree sequences `ts` and `other`,
     this method returns an object of type :class:`.ARFResult`.
     The values reported summarize the degree to which nodes in `ts`
     "match" corresponding nodes in `other`.
-    
+
     To match nodes,
     for each node in `ts`, the best matching node(s) from `other`
     has the longest matching span using :func:`.shared_node_spans`.
     If there are multiple matches with the same longest shared span
     for a single node, the best match is the match that is closest in time.
-    
+
     Then, :class:`.ARFResult` contains:
 
     - (`dissimilarity`)
@@ -356,8 +356,8 @@ def compare(ts, other, transform=None):
         samples as its best match in `other`.
 
     - (`arf`)
-        The fraction of the total span of `ts` over which each nodes' 
-        descendant sample set does not match its' best match's descendant 
+        The fraction of the total span of `ts` over which each nodes'
+        descendant sample set does not match its' best match's descendant
         sample set (i.e., the total *un*-matched span divided by the total
         span of `ts`).
 
@@ -387,8 +387,11 @@ def compare(ts, other, transform=None):
     :rtype: ARFResult
     """
 
+    def f(t):
+        return np.log(1 + t)
+
     if transform is None:
-        transform = lambda t: np.log(1 + t)
+        transform = f
 
     shared_spans = shared_node_spans(ts, other)
     # Find all potential matches for a node based on max shared span length
@@ -403,7 +406,9 @@ def compare(ts, other, transform=None):
     # determine best matches with the best_match_matrix
     ts_times = ts.nodes_time[row_ind[match]]
     other_times = other.nodes_time[col_ind[match]]
-    time_difference = np.absolute(np.asarray(transform(ts_times) - transform(other_times)))
+    time_difference = np.absolute(
+        np.asarray(transform(ts_times) - transform(other_times))
+    )
     # If a node x in `ts` has no match then we set time_difference to zero
     # This node then does not effect the rmse
     for j in range(len(shared_spans.data[match])):
@@ -438,13 +443,10 @@ def compare(ts, other, transform=None):
     product = np.multiply((time_discrepancies**2), ts_node_spans)
     rmse = np.sqrt(np.sum(product) / total_span_ts)
     return ARFResult(
-
-            arf = 1.0 - total_match_span / total_span_ts,
-            tpr = total_match_span / total_span_other,
-
-            dissimilarity = total_span_ts - total_match_span,
-            total_span = (total_span_ts, total_span_other),
-            rmse = rmse,
-            transform = transform,
+        arf=1.0 - total_match_span / total_span_ts,
+        tpr=total_match_span / total_span_other,
+        dissimilarity=total_span_ts - total_match_span,
+        total_span=(total_span_ts, total_span_other),
+        rmse=rmse,
+        transform=transform,
     )
-
