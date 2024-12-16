@@ -1,0 +1,7 @@
+tskit
+numpy
+scipy
+pytest
+pytest-cov
+pytest-xdist
+msprime>=1.0.0
