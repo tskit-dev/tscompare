@@ -29,7 +29,10 @@ np.random.seed(1234)
 
 
 (sec_usage)=
+
 # Usage
+
+(sec_quickstart)=
 
 ## Quickstart
 
@@ -37,9 +40,10 @@ To set up an example, let's (1) simulate a tree sequence with {program}`msprime`
 (2) infer a tree sequence from the resulting genetic variation data with {program}`tsinfer`.
 ```{code-cell}
 orig_ts = msprime.sim_ancestry(
-            100, recombination_rate=1e-8,
-            population_size=1e3, sequence_length=1e6, record_full_arg=True)
-orig_ts = msprime.sim_mutations(orig_ts, rate=1e-8)
+            100, recombination_rate=1e-8, population_size=1e3,
+            sequence_length=1e6, record_full_arg=True,
+            random_seed=123)
+orig_ts = msprime.sim_mutations(orig_ts, rate=1e-8, random_seed=456)
 vdata = tsinfer.SampleData.from_tree_sequence(orig_ts)
 inferred_ts = tsinfer.infer(vdata)
 ```
