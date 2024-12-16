@@ -7,13 +7,6 @@ on:
     tags:
       - '*'
 
-env:
-  COMMIT_EMAIL: ben.jeffery.well+adminbot@gmail.com
-  MAKE_TARGET: -C python
-  OWNER: tskit-dev
-  REPO: tskit
-  REQUIREMENTS: python/requirements/CI-docs/requirements.txt
-
 jobs:
   build-deploy-docs:
     name: Docs
@@ -29,26 +22,25 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/setup-python@v5.3.0
         with:
-          miniforge-version: latest
-          activate-environment: tskit-docs-env
-          
-      - name: Cache Conda env
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.CONDA }}/envs
-          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ hashFiles(env.REQUIREMENTS) }}-${{ env.CACHE_NUMBER }}
-        env:
-          CACHE_NUMBER: 0
-        id: cache
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Update environment
+      - name: Create venv and install deps (one by one to avoid conflict errors)
         run: |
-          mamba install -y python=3.12 doxygen pip
-          pip install -r ${{ env.REQUIREMENTS }}
-        if: steps.cache.outputs.cache-hit != 'true'
+          pip install --upgrade pip wheel
+          pip install -r requirements/CI-docs-pip/requirements.txt
 
       - name: Build Docs
-        run: make -C docs
+        run: |
+          cd docs
+          make
+
+      - name: Trigger docs site rebuild
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -X POST https://api.github.com/repos/tskit-dev/tskit-site/dispatches \
+                    -H 'Accept: application/vnd.github.everest-preview+json' \
+                    -u AdminBot-tskit:${{ secrets.ADMINBOT_TOKEN }} \
+                    --data '{"event_type":"build-docs"}'
