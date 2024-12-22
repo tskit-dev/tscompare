@@ -335,7 +335,7 @@ class ARFResult:
         return out
 
 
-def compare(ts, other, transform=None):
+def compare(ts, other, transform=None, ties="average"):
     """
     For two tree sequences `ts` and `other`,
     this method returns an object of type :class:`.ARFResult`.
@@ -379,10 +379,22 @@ def compare(ts, other, transform=None):
     root-mean-squared error (see :class:`.ARFResult`); the default
     is `log(1 + t)`.
 
+    The callable `ties` is used to determine matching between nodes.
+    Current options are `None` and `average`.
+    The `None` option allows multiple nodes in `ts` to match with a 
+    single node in `other`, the similarity between `ts` and `other`
+    can then exceed the total node span of `other`.
+    For each node in `other`, the `average` argument computes the 
+    average shared span amongst all nodes in `ts` which are its match.
+    The similarity will then not exceed the total node span of `other`.
+    Default is `average`.
+
     :param ts: The focal tree sequence.
     :param other: The tree sequence we compare to.
     :param transform: A callable that can take an array of times and
         return another array of numbers.
+    :param ties: A callable that determines the matching process
+        between nodes. 
     :return: The three quantities above.
     :rtype: ARFResult
     """
@@ -426,7 +438,10 @@ def compare(ts, other, transform=None):
     )
     # Between each pair of nodes, find the maximum shared span
     best_match = best_match_matrix.argmax(axis=1).A1
-    best_match_spans = shared_spans[np.arange(len(best_match)), best_match].reshape(-1)
+    if ties == "average"
+        best_match_spans = (shared_spans[np.arange(len(best_match)), best_match].reshape(-1))/np.bincount(best_match)
+    if ties is None:
+        best_match_spans = share_spans[np.arange(len(best_match)), best_match].reshape(-1)
     total_match_span = np.sum(best_match_spans)
     ts_node_spans = node_spans(ts)
     total_span_ts = np.sum(ts_node_spans)

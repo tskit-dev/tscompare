@@ -93,7 +93,7 @@ def naive_node_span(ts):
     return node_spans
 
 
-def naive_compare(ts, other, transform=None):
+def naive_compare(ts, other, transform=None, ties="average"):
     """
     Ineffiecient but transparent function to compute dissimilarity
     and root-mean-square-error between two tree sequences.
@@ -125,7 +125,10 @@ def naive_compare(ts, other, transform=None):
     best_match_spans = np.zeros((ts.num_nodes,))
     time_discrepancies = np.zeros((ts.num_nodes,))
     for i, j in enumerate(best_match):
-        best_match_spans[i] = shared_spans[i, j]
+        if ties is 'average':
+            best_match_spans[i] = share_spans[i, j]/np.bincount(best_match)[j]
+        if ties is None:
+            best_match_spans[i] = shared_spans[i, j]
         time_discrepancies[i] = time_array[i, j]
     node_span = naive_node_span(ts)
     total_node_spans = np.sum(node_span)
