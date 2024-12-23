@@ -439,9 +439,9 @@ def compare(ts, other, transform=None, ties="average"):
     # Between each pair of nodes, find the maximum shared span
     best_match = best_match_matrix.argmax(axis=1).A1
     if ties == "average":
-        best_match_spans = (shared_spans[np.arange(len(best_match)), best_match].reshape(-1))/np.bincount(best_match)
+        best_match_spans = shared_spans[np.arange(len(best_match)), best_match].reshape(-1)/np.bincount(best_match)[best_match].reshape(-1)
     if ties is None:
-        best_match_spans = share_spans[np.arange(len(best_match)), best_match].reshape(-1)
+        best_match_spans = shared_spans[np.arange(len(best_match)), best_match].reshape(-1)
     total_match_span = np.sum(best_match_spans)
     ts_node_spans = node_spans(ts)
     total_span_ts = np.sum(ts_node_spans)

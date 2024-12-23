@@ -126,7 +126,7 @@ def naive_compare(ts, other, transform=None, ties="average"):
     time_discrepancies = np.zeros((ts.num_nodes,))
     for i, j in enumerate(best_match):
         if ties == 'average':
-            best_match_spans[i] = share_spans[i, j]/np.bincount(best_match)[j]
+            best_match_spans[i] = shared_spans[i, j]/np.bincount(best_match)[j]
         if ties is None:
             best_match_spans[i] = shared_spans[i, j]
         time_discrepancies[i] = time_array[i, j]
@@ -213,7 +213,7 @@ class TestNodeMatching:
 
 class TestDissimilarity:
 
-    def verify_compare(self, ts, other, transform=None):
+    def verify_compare(self, ts, other, transform=None, ties="average"):
         match_span, ts_span, other_span, rmse = naive_compare(
             ts, other, transform=transform, ties=ties,
         )
