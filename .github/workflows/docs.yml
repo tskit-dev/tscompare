@@ -10,7 +10,7 @@ on:
 jobs:
   build-deploy-docs:
     name: Docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         shell: bash -l {0}
