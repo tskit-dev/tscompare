@@ -374,6 +374,47 @@ class TestDissimilarity:
                     (6, 5, 0, 6),
                     (6, 7, 2, 5),
                 ]
+        if extra_match is True:
+            node_times[9] = 525.0
+            node_times[10] = 550.0
+            if span is False:
+                edges = [
+                (4, 0, 0, 6),
+                (4, 1, 0, 4),
+                (5, 2, 0, 2),
+                (5, 2, 4, 6),
+                (5, 3, 0, 6),
+                (9, 4, 0, 4),
+                (10, 9, 0, 4),
+                (7, 2, 2, 4),
+                (7, 10, 2, 4),
+                (8, 1, 4, 6),
+                (8, 5, 4, 6),
+                (6, 4, 4, 6),
+                (6, 5, 0, 4),
+                (6, 7, 2, 4),
+                (6, 8, 4, 6),
+                (6, 10, 0, 2),
+            ]
+            else:
+                edges = [
+                (4, 0, 0, 6),
+                (4, 1, 0, 5),
+                (5, 2, 0, 1),
+                (5, 2, 5, 6),
+                (5, 3, 0, 6),
+                (9, 4, 0, 5),
+                (10, 9, 0, 5),
+                (7, 2, 1, 5),
+                (7, 10, 1, 5),
+                (8, 1, 5, 6),
+                (8, 5, 5, 6),
+                (6, 4, 5, 6),
+                (6, 5, 0, 5),
+                (6, 7, 1, 5),
+                (6, 8, 5, 6),
+                (6, 10, 0, 1),
+            ]
         tables = tskit.TableCollection(sequence_length=6)
         if samples is None:
             samples = [0, 1, 2, 3]
@@ -388,7 +429,9 @@ class TestDissimilarity:
         ts = tables.tree_sequence()
         if no_match is True:
             assert ts.num_edges == 13
-        if no_match is False:
+        if extra_match is True:
+            assert ts.num_edges == 16
+        if no_match is False and extra_match is False:
             assert ts.num_edges == 14
         return ts
 
@@ -450,3 +493,13 @@ class TestDissimilarity:
         assert np.isclose(dis.tpr, (true_total_spans[0] - 4) / true_total_spans[1])
         assert np.isclose(dis.dissimilarity, 4)
         assert np.isclose(dis.rmse, true_rmse)
+
+    def test_extra_match(self):
+            ts = self.get_simple_ts(extra_match=True)
+            other = self.get_simple_ts()
+            dis = tscompare.compare(ts, other, transform=None)
+            true_sim = 6 * 6 + 2 * 2 + (1 / 3) * (6 + 4 + 4)
+            true_spans = (54, 46)
+            assert np.isclose(dis.arf, 1 - true_sim / true_spans[0])
+            assert np.isclose(dis.tpr, true_sim / true_spans[1])
+    
