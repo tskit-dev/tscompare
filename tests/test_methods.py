@@ -121,18 +121,27 @@ def naive_compare(ts, other, transform=None):
                         transform(ts.nodes_time[i]) - transform(other.nodes_time[j])
                     )
                     dissimilarity_matrix[i, j] = 1 / (1 + time_array[i, j])
-    best_match = np.argmax(dissimilarity_matrix, axis=1)
-    best_match_spans = np.zeros((ts.num_nodes,))
+    best_match_n1 = np.argmax(dissimilarity_matrix, axis=1)
+    best_match_n2 = np.argmax(dissimilarity_matrix, axis=0)
+    # find non-unque bins for nodes in n_2 then find max of node span from that bin.
+    best_match_n1_spans = np.zeros((ts.num_nodes,))
+    best_match_n2_spans = np.zeros((other.num_nodes,))
     time_discrepancies = np.zeros((ts.num_nodes,))
-    for i, j in enumerate(best_match):
-        best_match_spans[i] = shared_spans[i, j]/np.bincount(best_match)[j]
+    for i, j in enumerate(best_match_n1):
+        best_match_n1_spans[i] = shared_spans[i, j]
         time_discrepancies[i] = time_array[i, j]
+    for i, j in enumerate(best_match_n2):
+        if best_match_n1[j] == i:
+            best_match_n2_spans[i] = shared_spans[j, i]
+        else:
+            best_match_n2_spans[i] = 0.
     node_span = naive_node_span(ts)
     total_node_spans = np.sum(node_span)
     total_other_spans = np.sum(naive_node_span(other))
-    match_span = np.sum(best_match_spans)
+    match_n1_span = np.sum(best_match_n1_spans)
+    match_n2_span = np.sum(best_match_n2_spans)
     rmse = np.sqrt(np.sum(node_span * time_discrepancies**2) / total_node_spans)
-    return match_span, total_node_spans, total_other_spans, rmse
+    return match_n1_span, match_n2_span, total_node_spans, total_other_spans, rmse
 
 
 @pytest.mark.parametrize("ts", [true_unary, true_simpl])
@@ -211,13 +220,14 @@ class TestNodeMatching:
 class TestDissimilarity:
 
     def verify_compare(self, ts, other, transform=None):
-        match_span, ts_span, other_span, rmse = naive_compare(
+        match_n1_span, match_n2_span, ts_span, other_span, rmse = naive_compare(
             ts, other, transform=transform,
         )
         dis = tscompare.compare(ts, other, transform=transform)
-        assert np.isclose(1.0 - match_span / ts_span, dis.arf)
-        assert np.isclose(match_span / other_span, dis.tpr)
-        assert np.isclose(ts_span - match_span, dis.dissimilarity)
+        assert np.isclose(1.0 - match_n1_span / ts_span, dis.arf)
+        assert np.isclose(match_n2_span / other_span, dis.tpr)
+        assert np.isclose(ts_span - match_n1_span, dis.dissimilarity)
+        assert np.isclose(other_span - match_n2_span, dis.inverse_dissimilarity)
         assert np.isclose(ts_span, dis.total_span[0])
         assert np.isclose(other_span, dis.total_span[1])
         assert np.isclose(rmse, dis.rmse)
@@ -242,6 +252,15 @@ class TestDissimilarity:
         assert np.isclose(dis.dissimilarity, 0)
         assert np.isclose(dis.arf, 0)
         assert np.isclose(dis.rmse, 0)
+
+    @pytest.mark.parametrize(
+        "pair",
+        [(true_ext, true_ext), (true_simpl, true_unary)],
+    )
+    def test_inverse_dissimilarity(self, pair):
+        dis = tscompare.compare(pair[1], pair[0])
+        assert np.isclose(dis.tpr, 1)
+        assert np.isclose(dis.inverse_dissimilarity, 0)
 
     def test_transform(self):
         dis1 = tscompare.compare(true_simpl, true_simpl, transform=lambda t: t)
@@ -479,16 +498,19 @@ class TestDissimilarity:
             / true_total_spans[0]
         )
         assert np.isclose(dis.arf, 4 / true_total_spans[0])
-        assert np.isclose(dis.tpr, (true_total_spans[0] - 4) / true_total_spans[1])
+        assert np.isclose(dis.tpr, 5 / true_total_spans[1])
         assert np.isclose(dis.dissimilarity, 4)
+        assert np.isclose(dis.inverse_dissimilarity, 5)
         assert np.isclose(dis.rmse, true_rmse)
 
     def test_extra_match(self):
-            ts = self.get_simple_ts(extra_match=True)
-            other = self.get_simple_ts()
-            dis = tscompare.compare(ts, other, transform=None)
-            true_sim = 6 * 6 + 2 * 2 + (1 / 3) * (6 + 4 + 4)
-            true_spans = (54, 46)
-            assert np.isclose(dis.arf, 1 - true_sim / true_spans[0])
-            assert np.isclose(dis.tpr, true_sim / true_spans[1])
-    
+        ts = self.get_simple_ts(extra_match=True)
+        other = self.get_simple_ts()
+        dis = tscompare.compare(ts, other, transform=None)
+        n1_match_span = 7 * 6 + 2 * 2 + 2 * 4
+        n2_match_span = 6 * 6 + 2 * 2 + 6
+        true_spans = (54, 46)
+        assert np.isclose(dis.arf, 1 - n1_match_span / true_spans[0])
+        assert np.isclose(dis.tpr, n2_match_span / true_spans[1])
+        assert np.isclose(dis.dissimilarity, true_spans[0] - n1_match_span)
+        assert np.isclose(dis.inverse_dissimilarity, true_spans[1] - n2_match_span)

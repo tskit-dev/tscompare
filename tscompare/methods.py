@@ -301,6 +301,9 @@ class ARFResult:
     `dissimilarity`:
         The total span of `ts` that is not represented in `other`.
 
+    `inverse_dissimilarity`:
+        The total span of `other` that is not represented in `ts`.
+
     `total_span`:
         The total of all node spans of the two tree sequences, in order (`ts`, `other`).
 
@@ -328,6 +331,7 @@ class ARFResult:
         out += f"    ARF: {100 * self.arf:.2f}%\n"
         out += f"    TPR: {100 * self.tpr:.2f}%\n"
         out += f"    dissimilarity: {self.dissimilarity}\n"
+        out += f"    inverse_dissimilarity: {self.inverse_dissimilarity}\n"
         out += (
             f"    total span (ts, other): {self.total_span[0]}, {self.total_span[1]}\n"
         )
@@ -360,6 +364,11 @@ def compare(ts, other, transform=None):
         all nodes in `ts` over which each node is ancestral to the same set of
         samples as its best match in `other`.
 
+    - (`inverse_dissimiliarity`)
+        The total "inverse matching span", which is the total
+        span of all nodes in `other` over which each node is ancestral
+        to the same set of samples as its best match in `ts`.
+
     - (`arf`)
         The fraction of the total span of `ts` over which each nodes'
         descendant sample set does not match its' best match's descendant
@@ -368,7 +377,7 @@ def compare(ts, other, transform=None):
 
     - (`tpr`)
         The proportion of the span in `other` that is correctly
-        represented in `ts` (i.e., the total matching span divided
+        represented in `ts` (i.e., the total inverse matching span divided
         by the total span of `other`).
 
     - (`rmse`)
@@ -430,11 +439,16 @@ def compare(ts, other, transform=None):
         shape=(ts.num_nodes, other.num_nodes),
     )
     # Between each pair of nodes, find the maximum shared span
-    best_match = best_match_matrix.argmax(axis=1).A1
-    best_match_spans = shared_spans[np.arange(len(best_match)), best_match].reshape(
-        -1
-    ) / np.bincount(best_match)[best_match].reshape(-1)
-    total_match_span = np.sum(best_match_spans)
+    # n1_match is the matching N1 -> N2 (for arf, dissimilarity)
+    # n2_match is finds the max match between nodes in N2 and their
+    # best match in N1 based on max-span (for tpr, inverse_dissimilarity)
+    best_n1_match = best_match_matrix.argmax(axis=1).A1
+    best_n2_match = best_match_matrix.argmax(axis=0).A1
+    n2_match_mask = best_n1_match[best_n2_match] == np.arange(other.num_nodes)
+    best_match_n1_spans = shared_spans[np.arange(ts.num_nodes), best_n1_match].reshape(-1)
+    best_match_n2_spans = shared_spans[best_n2_match, np.arange(other.num_nodes)].reshape(-1)[0,n2_match_mask]
+    total_match_n1_span = np.sum(best_match_n1_spans)
+    total_match_n2_span = np.sum(best_match_n2_spans)
     ts_node_spans = node_spans(ts)
     total_span_ts = np.sum(ts_node_spans)
     total_span_other = np.sum(node_spans(other))
@@ -445,14 +459,15 @@ def compare(ts, other, transform=None):
         shape=(ts.num_nodes, other.num_nodes),
     )
     time_discrepancies = np.asarray(
-        time_matrix[np.arange(len(best_match)), best_match].reshape(-1)
+        time_matrix[np.arange(len(best_n1_match)), best_n1_match].reshape(-1)
     )
     product = np.multiply((time_discrepancies**2), ts_node_spans)
     rmse = np.sqrt(np.sum(product) / total_span_ts)
     return ARFResult(
-        arf=1.0 - total_match_span / total_span_ts,
-        tpr=total_match_span / total_span_other,
-        dissimilarity=total_span_ts - total_match_span,
+        arf=1.0 - total_match_n1_span / total_span_ts,
+        tpr=total_match_n2_span / total_span_other,
+        dissimilarity=total_span_ts - total_match_n1_span,
+        inverse_dissimilarity = total_span_other - total_match_n2_span,
         total_span=(total_span_ts, total_span_other),
         rmse=rmse,
         transform=transform,
