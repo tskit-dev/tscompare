@@ -319,6 +319,7 @@ class ARFResult:
     arf: float
     tpr: float
     dissimilarity: float
+    inverse_dissimilarity: float
     total_span: tuple
     rmse: float
     transform: callable
@@ -353,7 +354,7 @@ def compare(ts, other, transform=None):
     for a single node, the best match is the match that is closest in time.
 
     For each node in `other` we compute the best matched span
-    as the average shared span amongst all nodes in `ts` which are its match.
+    as the maximum shared span amongst all nodes in `ts` which are its match.
     The similarity will then not exceed the total node span of `other`,
     bounding `tpr` to a proportion between 0 and 1.
 
