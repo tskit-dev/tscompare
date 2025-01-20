@@ -122,7 +122,10 @@ def naive_compare(ts, other, transform=None):
                     )
                     dissimilarity_matrix[i, j] = 1 / (1 + time_array[i, j])
     best_match_n1 = np.argmax(dissimilarity_matrix, axis=1)
-    best_match_n2 = np.argmax(dissimilarity_matrix, axis=0)
+    n2_match_matrix = np.zeros((ts.num_nodes, other.num_nodes))
+    for i, j in enumerate(best_match_n1):
+        n2_match_matrix[i, j] = dissimilarity_matrix[i, j]
+    best_match_n2 = np.argmax(n2_match_matrix, axis=0)
     # find non-unque bins for nodes in n_2 then find max of node span from that bin.
     best_match_n1_spans = np.zeros((ts.num_nodes,))
     best_match_n2_spans = np.zeros((other.num_nodes,))

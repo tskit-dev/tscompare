@@ -444,7 +444,12 @@ def compare(ts, other, transform=None):
     # n2_match is finds the max match between nodes in N2 and their
     # best match in N1 based on max-span (for tpr, inverse_dissimilarity)
     best_n1_match = best_match_matrix.argmax(axis=1).A1
-    best_n2_match = best_match_matrix.argmax(axis=0).A1
+    n2_match_matrix = scipy.sparse.lil_matrix((ts.num_nodes, other.num_nodes))
+    n2_match_matrix[np.arange(ts.num_nodes), best_n1_match] = best_match_matrix.tocsr()[
+        np.arange(ts.num_nodes), best_n1_match
+    ]
+    n2_match_matrix = n2_match_matrix.tocsr()
+    best_n2_match = n2_match_matrix.argmax(axis=0).A1
     n2_match_mask = best_n1_match[best_n2_match] == np.arange(other.num_nodes)
     best_match_n1_spans = shared_spans[np.arange(ts.num_nodes), best_n1_match].reshape(
         -1
