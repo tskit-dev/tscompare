@@ -498,7 +498,7 @@ class TestDissimilarity:
             / true_total_spans[0]
         )
         assert np.isclose(dis.arf, 4 / true_total_spans[0])
-        assert np.isclose(dis.tpr, 5 / true_total_spans[1])
+        assert np.isclose(dis.tpr, (true_total_spans[1] - 5) / true_total_spans[1])
         assert np.isclose(dis.dissimilarity, 4)
         assert np.isclose(dis.inverse_dissimilarity, 5)
         assert np.isclose(dis.rmse, true_rmse)
