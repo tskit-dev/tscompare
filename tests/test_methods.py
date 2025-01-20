@@ -134,7 +134,7 @@ def naive_compare(ts, other, transform=None):
         if best_match_n1[j] == i:
             best_match_n2_spans[i] = shared_spans[j, i]
         else:
-            best_match_n2_spans[i] = 0.
+            best_match_n2_spans[i] = 0.0
     node_span = naive_node_span(ts)
     total_node_spans = np.sum(node_span)
     total_other_spans = np.sum(naive_node_span(other))
@@ -221,7 +221,9 @@ class TestDissimilarity:
 
     def verify_compare(self, ts, other, transform=None):
         match_n1_span, match_n2_span, ts_span, other_span, rmse = naive_compare(
-            ts, other, transform=transform,
+            ts,
+            other,
+            transform=transform,
         )
         dis = tscompare.compare(ts, other, transform=transform)
         assert np.isclose(1.0 - match_n1_span / ts_span, dis.arf)
@@ -269,7 +271,9 @@ class TestDissimilarity:
         assert dis1.rmse == dis2.rmse
         self.verify_compare(true_simpl, true_ext, transform=lambda t: 1 / (1 + t))
 
-    def get_simple_ts(self, samples=None, time=False, span=False, no_match=False, extra_match=False):
+    def get_simple_ts(
+        self, samples=None, time=False, span=False, no_match=False, extra_match=False
+    ):
         # A simple tree sequence we can use to properly test various
         # dissimilarity and MSRE values.
         #
@@ -388,42 +392,42 @@ class TestDissimilarity:
             node_times[10] = 550.0
             if span is False:
                 edges = [
-                (4, 0, 0, 6),
-                (4, 1, 0, 4),
-                (5, 2, 0, 2),
-                (5, 2, 4, 6),
-                (5, 3, 0, 6),
-                (9, 4, 0, 4),
-                (10, 9, 0, 4),
-                (7, 2, 2, 4),
-                (7, 10, 2, 4),
-                (8, 1, 4, 6),
-                (8, 5, 4, 6),
-                (6, 4, 4, 6),
-                (6, 5, 0, 4),
-                (6, 7, 2, 4),
-                (6, 8, 4, 6),
-                (6, 10, 0, 2),
-            ]
+                    (4, 0, 0, 6),
+                    (4, 1, 0, 4),
+                    (5, 2, 0, 2),
+                    (5, 2, 4, 6),
+                    (5, 3, 0, 6),
+                    (9, 4, 0, 4),
+                    (10, 9, 0, 4),
+                    (7, 2, 2, 4),
+                    (7, 10, 2, 4),
+                    (8, 1, 4, 6),
+                    (8, 5, 4, 6),
+                    (6, 4, 4, 6),
+                    (6, 5, 0, 4),
+                    (6, 7, 2, 4),
+                    (6, 8, 4, 6),
+                    (6, 10, 0, 2),
+                ]
             else:
                 edges = [
-                (4, 0, 0, 6),
-                (4, 1, 0, 5),
-                (5, 2, 0, 1),
-                (5, 2, 5, 6),
-                (5, 3, 0, 6),
-                (9, 4, 0, 5),
-                (10, 9, 0, 5),
-                (7, 2, 1, 5),
-                (7, 10, 1, 5),
-                (8, 1, 5, 6),
-                (8, 5, 5, 6),
-                (6, 4, 5, 6),
-                (6, 5, 0, 5),
-                (6, 7, 1, 5),
-                (6, 8, 5, 6),
-                (6, 10, 0, 1),
-            ]
+                    (4, 0, 0, 6),
+                    (4, 1, 0, 5),
+                    (5, 2, 0, 1),
+                    (5, 2, 5, 6),
+                    (5, 3, 0, 6),
+                    (9, 4, 0, 5),
+                    (10, 9, 0, 5),
+                    (7, 2, 1, 5),
+                    (7, 10, 1, 5),
+                    (8, 1, 5, 6),
+                    (8, 5, 5, 6),
+                    (6, 4, 5, 6),
+                    (6, 5, 0, 5),
+                    (6, 7, 1, 5),
+                    (6, 8, 5, 6),
+                    (6, 10, 0, 1),
+                ]
         tables = tskit.TableCollection(sequence_length=6)
         if samples is None:
             samples = [0, 1, 2, 3]

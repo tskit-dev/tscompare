@@ -446,8 +446,12 @@ def compare(ts, other, transform=None):
     best_n1_match = best_match_matrix.argmax(axis=1).A1
     best_n2_match = best_match_matrix.argmax(axis=0).A1
     n2_match_mask = best_n1_match[best_n2_match] == np.arange(other.num_nodes)
-    best_match_n1_spans = shared_spans[np.arange(ts.num_nodes), best_n1_match].reshape(-1)
-    best_match_n2_spans = shared_spans[best_n2_match, np.arange(other.num_nodes)].reshape(-1)[0,n2_match_mask]
+    best_match_n1_spans = shared_spans[np.arange(ts.num_nodes), best_n1_match].reshape(
+        -1
+    )
+    best_match_n2_spans = shared_spans[
+        best_n2_match, np.arange(other.num_nodes)
+    ].reshape(-1)[0, n2_match_mask]
     total_match_n1_span = np.sum(best_match_n1_spans)
     total_match_n2_span = np.sum(best_match_n2_spans)
     ts_node_spans = node_spans(ts)
@@ -468,7 +472,7 @@ def compare(ts, other, transform=None):
         arf=1.0 - total_match_n1_span / total_span_ts,
         tpr=total_match_n2_span / total_span_other,
         dissimilarity=total_span_ts - total_match_n1_span,
-        inverse_dissimilarity = total_span_other - total_match_n2_span,
+        inverse_dissimilarity=total_span_other - total_match_n2_span,
         total_span=(total_span_ts, total_span_other),
         rmse=rmse,
         transform=transform,
