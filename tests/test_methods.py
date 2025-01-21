@@ -538,15 +538,10 @@ class TestDissimilarity:
                 (3, 1, 0, 3),
                 (4, 3, 0, 3),
                 (5, 2, 0, 3),
-                (5, 4, 0, 3)
+                (5, 4, 0, 3),
             ]
         else:
-            edges = [
-                (3, 0, 0, 3),
-                (3, 1, 0, 3),
-                (4, 2, 0, 3),
-                (4, 3, 0, 3)
-            ]
+            edges = [(3, 0, 0, 3), (3, 1, 0, 3), (4, 2, 0, 3), (4, 3, 0, 3)]
         tables = tskit.TableCollection(sequence_length=3)
         if samples is None:
             samples = [0, 1, 2]
@@ -571,7 +566,7 @@ class TestDissimilarity:
         dis = tscompare.compare(ts, other, transform=None)
         true_spans = (15, 18)
         match_spans = (15, 15)
-        assert np.isclose(dis.arf, 1 - match_spans[0]/true_spans[0])
-        assert np.isclose(dis.tpr, match_spans[1]/true_spans[1])
+        assert np.isclose(dis.arf, 1 - match_spans[0] / true_spans[0])
+        assert np.isclose(dis.tpr, match_spans[1] / true_spans[1])
         assert np.isclose(dis.dissimilarity, true_spans[0] - match_spans[0])
         assert np.isclose(dis.inverse_dissimilarity, true_spans[1] - match_spans[1])
