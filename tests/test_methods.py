@@ -243,6 +243,20 @@ class TestDissimilarity:
         assert np.isclose(other_span, dis.total_span[1])
         assert np.isclose(rmse, dis.rmse), f"{rmse} != {dis.rmse}"
 
+    def test_samples_dont_match(self):
+        ts1 = tskit.Tree.generate_star(2).tree_sequence
+        ts2 = tskit.Tree.generate_star(3).tree_sequence
+        with pytest.raises(ValueError, match="Samples.*agree"):
+            tscompare.compare(ts1, ts2)
+        tables = ts1.dump_tables()
+        tables.nodes.clear()
+        tables.nodes.add_row(time=0, flags=tskit.NODE_IS_SAMPLE)
+        tables.nodes.add_row(time=0, flags=0)
+        tables.nodes.add_row(time=1, flags=tskit.NODE_IS_SAMPLE)
+        ts2 = tables.tree_sequence()
+        with pytest.raises(ValueError, match="Samples.*agree"):
+            tscompare.compare(ts1, ts2)
+
     def test_very_simple(self):
         # 1.00┊  2  ┊
         #     ┊ ┏┻┓ ┊

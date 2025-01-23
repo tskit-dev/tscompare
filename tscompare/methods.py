@@ -349,16 +349,17 @@ class ARFResult:
 
 def compare(ts, other, transform=None):
     """
-    For two tree sequences `ts` and `other`,
-    this method returns an object of type :class:`.ARFResult`.
-    The values reported summarize the degree to which nodes in `ts`
-    "match" corresponding nodes in `other`.
+    For two tree sequences `ts` and `other`, this method returns an object of
+    type :class:`.ARFResult`.  The values reported summarize the degree to
+    which nodes in `ts` "match" corresponding nodes in `other`.
 
-    To match nodes,
-    for each node in `ts`, the best matching node(s) from `other`
-    has the longest matching span using :func:`.shared_node_spans`.
+    To match nodes, for each node in `ts`, the best matching node(s) from
+    `other` has the longest matching span using :func:`.shared_node_spans`.
     If there are multiple matches with the same longest shared span
     for a single node, the best match is the match that is closest in time.
+    This assumes that the samples are the same in both tree sequences:
+    in other words, if node `i` is a sample node in `ts`, then node `i` is
+    also a sample node in `other` (and vice-versa).
 
     For each node in `other` we compute the best matched span
     as the maximum shared span amongst all nodes in `ts` which are its match.
@@ -410,7 +411,7 @@ def compare(ts, other, transform=None):
     """
 
     samples = ts.samples()
-    if not np.all(samples == other.samples()):
+    if ts.num_samples != other.num_samples or np.any(samples != other.samples()):
         raise ValueError("Samples in `ts` and `other` must agree.")
 
     def f(t):
