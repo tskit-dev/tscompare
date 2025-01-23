@@ -79,7 +79,7 @@ def naive_shared_node_spans(ts, other):
     return scipy.sparse.csr_matrix(out)
 
 
-def naive_node_span(ts):
+def naive_node_span(ts, include_missing=False):
     """
     Ineffiecient but transparent function to get total span
     of each node in a tree sequence, including roots.
@@ -87,7 +87,10 @@ def naive_node_span(ts):
     node_spans = np.zeros(ts.num_nodes)
     for t in ts.trees():
         for n in t.nodes():
-            if t.parent(n) != tskit.NULL or t.num_children(n) > 0:
+            in_tree = (t.parent(n) != tskit.NULL or t.num_children(n) > 0) or (
+                include_missing and t.is_sample(n)
+            )
+            if in_tree:
                 span = t.span
                 node_spans[n] += span
     return node_spans
@@ -119,12 +122,16 @@ def naive_compare(ts, other, transform=None):
         if rm > 0:
             for j in range(shared_spans.shape[1]):
                 if shared_spans[i, j] == rm:
-                    dft = np.abs(transform(ts.nodes_time[i]) - transform(other.nodes_time[j]))
+                    dft = np.abs(
+                        transform(ts.nodes_time[i]) - transform(other.nodes_time[j])
+                    )
                     time_diff_matrix[i, j] = dft
     best_match_ts = np.argmin(time_diff_matrix, axis=1)
     time_diffs = np.min(time_diff_matrix, axis=1)
     fd = np.isfinite(time_diffs)
-    rmse = np.sqrt(np.sum((node_span_ts * time_diffs)[fd]**2) / np.sum(node_span_ts[fd]))
+    rmse = np.sqrt(
+        np.sum((node_span_ts * time_diffs)[fd] ** 2) / np.sum(node_span_ts[fd])
+    )
 
     # this matrix has in each row the span of its best match and zeros otherwise
     best_match_matrix = np.zeros(shared_spans.shape)
@@ -249,27 +256,64 @@ class TestDissimilarity:
         assert dis.inverse_dissimilarity == 0.0
         assert dis.total_span == (3.0, 3.0)
         assert dis.rmse == 0.0
-        # remove 1->2 branch
+
+    def test_missing_data(self):
+        # ts as in test_very_simple; empty_ts without 2->1 branch:
+        #
+        # 1.00┊ 2   ┊
+        #     ┊ ┃   ┊
+        # 0.00┊ 0 1 ┊
+        #     0     1
+        ts = tskit.Tree.generate_star(2).tree_sequence
         tables = ts.tables
         tables.edges.clear()
         tables.edges.add_row(parent=2, child=0, left=0, right=1)
         empty_ts = tables.tree_sequence()
         dis = tscompare.compare(ts, empty_ts)
-        assert np.isclose(dis.arf, 1/3)
-        assert dis.tpr == 1.0
+        assert np.isclose(dis.arf, 1 / 3)
+        assert np.isclose(dis.tpr, 2 / 3)
         assert dis.dissimilarity == 1.0
-        assert dis.inverse_dissimilarity == 0.0
-        assert dis.total_span == (3.0, 2.0)
+        assert dis.inverse_dissimilarity == 1.0
+        assert dis.total_span == (3.0, 3.0)
         assert dis.rmse == 0.0
+        # note that here both 0 and 2 in empty_ts map to 0 in ts!
         dis = tscompare.compare(empty_ts, ts)
-        print(dis)
-        assert np.isclose(dis.arf, 1/3)
-        assert np.isclose(dis.tpr, 2/3)
+        assert dis.arf == 0.0
+        assert np.isclose(dis.tpr, 2 / 3)
         assert dis.dissimilarity == 0.0
         assert dis.inverse_dissimilarity == 1.0
-        assert dis.total_span == (2.0, 3.0)
-        assert np.isnan(dis.rmse)
+        assert dis.total_span == (3.0, 3.0)
+        # here 0->0 (dt=0), 1->1 (dt=0), and (2->0) (dt=1)
+        rmse = np.sqrt((1 / 3) * (0 + 0 + np.log(1 + 1) ** 2))
+        assert np.isclose(dis.rmse, rmse)
 
+    def test_no_matches(self):
+        # This is an example where no nodes match any other nodes,
+        # since both are samples:
+        # 1.00┊ 1 ┊         1.00┊ 0 ┊
+        #     ┊ ┃ ┊   and       ┊ ┃ ┊
+        # 0.00┊ 0 ┊         0.00┊ 1 ┊
+        #     0   1             0   1
+        # Note that if samples weren't required to match samples,
+        # then 1 in the first matches 0 in the second (both are
+        # ancestral to {0, 1})
+        tables = tskit.TableCollection(sequence_length=1.0)
+        c = tables.nodes.add_row(time=0, flags=1)
+        p = tables.nodes.add_row(time=1, flags=1)
+        tables.edges.add_row(parent=p, child=c, left=0, right=1)
+        ts1 = tables.tree_sequence()
+        tables.clear()
+        p = tables.nodes.add_row(time=1, flags=1)
+        c = tables.nodes.add_row(time=0, flags=1)
+        tables.edges.add_row(parent=p, child=c, left=0, right=1)
+        ts2 = tables.tree_sequence()
+        dis = tscompare.compare(ts1, ts2)
+        assert dis.arf == 1.0
+        assert dis.tpr == 0.0
+        assert dis.dissimilarity == 2.0
+        assert dis.inverse_dissimilarity == 2.0
+        assert dis.total_span == (2.0, 2.0)
+        assert np.isnan(dis.rmse)
 
     @pytest.mark.parametrize(
         "pair",

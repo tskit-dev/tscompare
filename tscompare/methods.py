@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2024 Tskit Developers
+# Copyright (c) 2025 Tskit Developers
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -32,12 +32,17 @@ import scipy.sparse
 import tskit
 
 
-def node_spans(ts):
+def node_spans(ts, include_missing=False):
     """
     Returns the array of "node spans", i.e., the `j`th entry gives
-    the total span over which node `j` is in the tree sequence
-    (i.e., does not have 'missing data' there).
+    the total span over which node `j` is in the tree sequence.
+    Sample nodes that are isolated are "missing data"; inclusion
+    of these spans are controlled by `include_missing`. (If
+    `include_missing` is `True` then the span of each sample is
+    always equal to the sequence length.)
 
+    :param bool include_missing: Whether to include spans of missing
+        data. Only affects the span of sample nodes.
     """
     child_spans = np.bincount(
         ts.edges_child,
@@ -48,7 +53,7 @@ def node_spans(ts):
         span = t.span
         for r in t.roots:
             # do this check to exempt 'missing data'
-            if t.num_children(r) > 0:
+            if include_missing or (t.num_children(r) > 0):
                 child_spans[r] += span
     return child_spans
 
@@ -170,10 +175,12 @@ def shared_node_spans(ts, other):
     Calculate the spans over which pairs of nodes in two tree sequences are
     ancestral to identical sets of samples.
 
-
     Returns a sparse matrix where rows correspond to nodes in `ts` and columns
     correspond to nodes in `other`, and whose value is the total amount of span
     over which the set of samples inheriting from the two nodes is identical.
+
+    The shared span of a sample node with itself includes spans over which it
+    has missing data.
 
     :return: A sparse matrix of class `scipy.sparse.csr_matrix`.
     """
@@ -402,21 +409,32 @@ def compare(ts, other, transform=None):
     :rtype: ARFResult
     """
 
+    samples = ts.samples()
+    if not np.all(samples == other.samples()):
+        raise ValueError("Samples in `ts` and `other` must agree.")
+
     def f(t):
         return np.log(1 + t)
 
     if transform is None:
         transform = f
 
-    ts_node_spans = node_spans(ts)
+    ts_node_spans = node_spans(ts, include_missing=True)
     shared_spans = shared_node_spans(ts, other)
     col_ind = shared_spans.indices
     row_ind = np.repeat(
         np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
     )
+    # We require that the samples are the same in both trees!
+    # If we did not require this, we could identify swapped samples,
+    # but this is out of scope (people could detect this using
+    # the shared spans matrix directly).
+    is_sample = np.full(ts.num_samples, False)
+    is_sample[samples] = True
+    shared_spans.data[~np.logical_xor(is_sample[row_ind], is_sample[col_ind])] = 0.0
     # Find all potential matches for a node based on max shared span length
     max_span = shared_spans.max(axis=1).toarray().flatten()
-    total_match_n1_span = np.sum(max_span) # <---- one thing to output
+    total_match_n1_span = np.sum(max_span)  # <---- one thing to output
     # zero out everything that's not a row max
     shared_spans.data[shared_spans.data != max_span[row_ind]] = 0.0
     # now re-sparsify the matrix: but, beware! don't do this again later.
@@ -425,7 +443,7 @@ def compare(ts, other, transform=None):
     row_ind = np.repeat(
         np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
     )
-    
+
     # now, make a matrix with differences in transformed times
     # in the places where shared_spans retains nonzero elements
     time_diff = shared_spans.copy()
@@ -436,9 +454,12 @@ def compare(ts, other, transform=None):
     )
     # "explicit=True" takes the min of only the entries explicitly represented
     dt = time_diff.min(axis=1, explicit=True).toarray().flatten()
-    has_match = (max_span != 0)
+    has_match = max_span != 0
     if np.any(has_match):
-        rmse = np.sqrt(np.sum(dt[has_match]**2 * ts_node_spans[has_match]) / np.sum(ts_node_spans[has_match]))
+        rmse = np.sqrt(
+            np.sum(dt[has_match] ** 2 * ts_node_spans[has_match])
+            / np.sum(ts_node_spans[has_match])
+        )
         # ^-- another thing to output
     else:
         rmse = np.nan
@@ -446,10 +467,12 @@ def compare(ts, other, transform=None):
     # next, zero out also those non-best-time-match elements
     shared_spans.data[time_diff.data != dt[row_ind]] = 0.0
     # and, find sum of column maxima
-    total_match_n2_span = shared_spans.max(axis=0).sum() # <--- the other thing we return
+    total_match_n2_span = shared_spans.max(
+        axis=0
+    ).sum()  # <--- the other thing we return
 
     total_span_ts = np.sum(ts_node_spans)
-    total_span_other = np.sum(node_spans(other))
+    total_span_other = np.sum(node_spans(other, include_missing=True))
     return ARFResult(
         arf=1.0 - total_match_n1_span / total_span_ts,
         tpr=total_match_n2_span / total_span_other,
