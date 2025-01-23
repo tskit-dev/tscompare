@@ -105,46 +105,45 @@ def naive_compare(ts, other, transform=None):
     if transform is None:
         transform = f
 
+    node_span_ts = naive_node_span(ts)
+    total_span_ts = np.sum(node_span_ts)
     shared_spans = naive_shared_node_spans(ts, other).toarray()
-    max_span = np.max(shared_spans, axis=1)
-    assert len(max_span) == ts.num_nodes
-    time_array = np.zeros((ts.num_nodes, other.num_nodes))
-    dissimilarity_matrix = np.zeros((ts.num_nodes, other.num_nodes))
-    for i in range(ts.num_nodes):
-        # Skip nodes with no match in shared_spans
-        if max_span[i] == 0:
-            continue
-        else:
-            for j in range(other.num_nodes):
-                if shared_spans[i, j] == max_span[i]:
-                    time_array[i, j] = np.abs(
-                        transform(ts.nodes_time[i]) - transform(other.nodes_time[j])
-                    )
-                    dissimilarity_matrix[i, j] = 1 / (1 + time_array[i, j])
-    best_match_n1 = np.argmax(dissimilarity_matrix, axis=1)
-    n2_match_matrix = np.zeros((ts.num_nodes, other.num_nodes))
-    for i, j in enumerate(best_match_n1):
-        n2_match_matrix[i, j] = dissimilarity_matrix[i, j]
-    best_match_n2 = np.argmax(n2_match_matrix, axis=0)
-    # find non-unque bins for nodes in n_2 then find max of node span from that bin.
-    best_match_n1_spans = np.zeros((ts.num_nodes,))
-    best_match_n2_spans = np.zeros((other.num_nodes,))
-    time_discrepancies = np.zeros((ts.num_nodes,))
-    for i, j in enumerate(best_match_n1):
-        best_match_n1_spans[i] = shared_spans[i, j]
-        time_discrepancies[i] = time_array[i, j]
-    for i, j in enumerate(best_match_n2):
-        if best_match_n1[j] == i:
-            best_match_n2_spans[i] = shared_spans[j, i]
-        else:
-            best_match_n2_spans[i] = 0.0
-    node_span = naive_node_span(ts)
-    total_node_spans = np.sum(node_span)
-    total_other_spans = np.sum(naive_node_span(other))
-    match_n1_span = np.sum(best_match_n1_spans)
-    match_n2_span = np.sum(best_match_n2_spans)
-    rmse = np.sqrt(np.sum(node_span * time_discrepancies**2) / total_node_spans)
-    return match_n1_span, match_n2_span, total_node_spans, total_other_spans, rmse
+    row_max_span = np.max(shared_spans, axis=1)
+    total_match_span_ts = np.sum(row_max_span)
+    assert len(row_max_span) == ts.num_nodes
+    # this matrix has |dft| for every shared span entry that's equal to its
+    # row max, and zeros otherwise
+    time_diff_matrix = np.full(shared_spans.shape, np.inf)
+    for i in range(shared_spans.shape[0]):
+        rm = row_max_span[i]
+        if rm > 0:
+            for j in range(shared_spans.shape[1]):
+                if shared_spans[i, j] == rm:
+                    dft = np.abs(transform(ts.nodes_time[i]) - transform(other.nodes_time[j]))
+                    time_diff_matrix[i, j] = dft
+    best_match_ts = np.argmin(time_diff_matrix, axis=1)
+    time_diffs = np.min(time_diff_matrix, axis=1)
+    fd = np.isfinite(time_diffs)
+    rmse = np.sqrt(np.sum((node_span_ts * time_diffs)[fd]**2) / np.sum(node_span_ts[fd]))
+
+    # this matrix has in each row the span of its best match and zeros otherwise
+    best_match_matrix = np.zeros(shared_spans.shape)
+    for i in range(shared_spans.shape[0]):
+        rm = row_max_span[i]
+        j = best_match_ts[i]
+        assert shared_spans[i, j] == rm, f"{i}, {j}: {rm}"
+        best_match_matrix[i, j] = rm
+    best_match_other_span = np.max(best_match_matrix, axis=0)
+    total_match_span_other = np.sum(best_match_other_span)
+
+    total_span_other = np.sum(naive_node_span(other))
+    return (
+        total_match_span_ts,
+        total_match_span_other,
+        total_span_ts,
+        total_span_other,
+        rmse,
+    )
 
 
 @pytest.mark.parametrize("ts", [true_unary, true_simpl])
@@ -235,7 +234,7 @@ class TestDissimilarity:
         assert np.isclose(other_span - match_n2_span, dis.inverse_dissimilarity)
         assert np.isclose(ts_span, dis.total_span[0])
         assert np.isclose(other_span, dis.total_span[1])
-        assert np.isclose(rmse, dis.rmse)
+        assert np.isclose(rmse, dis.rmse), f"{rmse} != {dis.rmse}"
 
     @pytest.mark.parametrize(
         "pair",
