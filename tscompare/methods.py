@@ -408,74 +408,52 @@ def compare(ts, other, transform=None):
     if transform is None:
         transform = f
 
+    ts_node_spans = node_spans(ts)
     shared_spans = shared_node_spans(ts, other)
-    # Find all potential matches for a node based on max shared span length
-    max_span = shared_spans.max(axis=1).toarray().flatten()
     col_ind = shared_spans.indices
     row_ind = np.repeat(
         np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
     )
-    # mask to find all potential node matches
-    match = shared_spans.data == max_span[row_ind]
-    # scale with difference in node times
-    # determine best matches with the best_match_matrix
-    ts_times = ts.nodes_time[row_ind[match]]
-    other_times = other.nodes_time[col_ind[match]]
-    time_difference = np.absolute(
+    # Find all potential matches for a node based on max shared span length
+    max_span = shared_spans.max(axis=1).toarray().flatten()
+    total_match_n1_span = np.sum(max_span) # <---- one thing to output
+    # zero out everything that's not a row max
+    shared_spans.data[shared_spans.data != max_span[row_ind]] = 0.0
+    # now re-sparsify the matrix: but, beware! don't do this again later.
+    shared_spans.eliminate_zeros()
+    col_ind = shared_spans.indices
+    row_ind = np.repeat(
+        np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
+    )
+    
+    # now, make a matrix with differences in transformed times
+    # in the places where shared_spans retains nonzero elements
+    time_diff = shared_spans.copy()
+    ts_times = ts.nodes_time[row_ind]
+    other_times = other.nodes_time[col_ind]
+    time_diff.data[:] = np.absolute(
         np.asarray(transform(ts_times) - transform(other_times))
     )
-    # If a node x in `ts` has no match then we set time_difference to zero
-    # This node then does not effect the rmse
-    for j in range(len(shared_spans.data[match])):
-        if shared_spans.data[match][j] == 0:
-            time_difference[j] = 0.0
-    # If two nodes have the same time, then
-    # time_difference is zero, which causes problems with argmin
-    # Instead we store data as 1/(1+x) and find argmax
-    best_match_matrix = scipy.sparse.coo_matrix(
-        (
-            1 / (1 + time_difference),
-            (row_ind[match], col_ind[match]),
-        ),
-        shape=(ts.num_nodes, other.num_nodes),
-    )
-    # Between each pair of nodes, find the maximum shared span
-    # n1_match is the matching N1 -> N2 (for arf, dissimilarity)
-    # n2_match is finds the max match between nodes in N2 and their
-    # best match in N1 based on max-span (for tpr, inverse_dissimilarity)
-    best_n1_match = best_match_matrix.argmax(axis=1).A1
-    n2_match_matrix = best_match_matrix.tocsr()
-    bmm_row_ind = np.repeat(
-        np.arange(n2_match_matrix.shape[0]), repeats=np.diff(n2_match_matrix.indptr)
-    )
-    n2_match_matrix.data *= n2_match_matrix.indices == best_n1_match[bmm_row_ind]
-    best_n2_match = n2_match_matrix.argmax(axis=0).A1
-    n2_match_mask = best_n1_match[best_n2_match] == np.arange(other.num_nodes)
-    best_match_n1_spans = shared_spans[np.arange(ts.num_nodes), best_n1_match].reshape(
-        -1
-    )
-    best_match_n2_spans = shared_spans[
-        best_n2_match, np.arange(other.num_nodes)
-    ].reshape(-1)[0, n2_match_mask]
-    total_match_n1_span = np.sum(best_match_n1_spans)
-    total_match_n2_span = np.sum(best_match_n2_spans)
-    ts_node_spans = node_spans(ts)
+    # "explicit=True" takes the min of only the entries explicitly represented
+    dt = time_diff.min(axis=1, explicit=True).toarray().flatten()
+    has_match = (max_span != 0)
+    if np.any(has_match):
+        rmse = np.sqrt(np.sum(dt[has_match]**2 * ts_node_spans[has_match]) / np.sum(ts_node_spans[has_match]))
+        # ^-- another thing to output
+    else:
+        rmse = np.nan
+
+    # next, zero out also those non-best-time-match elements
+    shared_spans.data[time_diff.data != dt[row_ind]] = 0.0
+    # and, find sum of column maxima
+    total_match_n2_span = shared_spans.max(axis=0).sum() # <--- the other thing we return
+
     total_span_ts = np.sum(ts_node_spans)
     total_span_other = np.sum(node_spans(other))
-    # Compute the root-mean-square difference in transformed time
-    # with the average weighted by span in ts
-    time_matrix = scipy.sparse.csr_matrix(
-        (time_difference, (row_ind[match], col_ind[match])),
-        shape=(ts.num_nodes, other.num_nodes),
-    )
-    time_discrepancies = np.asarray(
-        time_matrix[np.arange(len(best_n1_match)), best_n1_match].reshape(-1)
-    )
-    product = np.multiply((time_discrepancies**2), ts_node_spans)
-    rmse = np.sqrt(np.sum(product) / total_span_ts)
     return ARFResult(
         arf=1.0 - total_match_n1_span / total_span_ts,
         tpr=total_match_n2_span / total_span_other,
+        # matched_span=(total_match_n1_span, total_match_n2_span),
         dissimilarity=total_span_ts - total_match_n1_span,
         inverse_dissimilarity=total_span_other - total_match_n2_span,
         total_span=(total_span_ts, total_span_other),

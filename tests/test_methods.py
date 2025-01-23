@@ -236,6 +236,41 @@ class TestDissimilarity:
         assert np.isclose(other_span, dis.total_span[1])
         assert np.isclose(rmse, dis.rmse), f"{rmse} != {dis.rmse}"
 
+    def test_very_simple(self):
+        # 1.00┊  2  ┊
+        #     ┊ ┏┻┓ ┊
+        # 0.00┊ 0 1 ┊
+        #     0     1
+        ts = tskit.Tree.generate_star(2).tree_sequence
+        dis = tscompare.compare(ts, ts)
+        assert dis.arf == 0.0
+        assert dis.tpr == 1.0
+        assert dis.dissimilarity == 0.0
+        assert dis.inverse_dissimilarity == 0.0
+        assert dis.total_span == (3.0, 3.0)
+        assert dis.rmse == 0.0
+        # remove 1->2 branch
+        tables = ts.tables
+        tables.edges.clear()
+        tables.edges.add_row(parent=2, child=0, left=0, right=1)
+        empty_ts = tables.tree_sequence()
+        dis = tscompare.compare(ts, empty_ts)
+        assert np.isclose(dis.arf, 1/3)
+        assert dis.tpr == 1.0
+        assert dis.dissimilarity == 1.0
+        assert dis.inverse_dissimilarity == 0.0
+        assert dis.total_span == (3.0, 2.0)
+        assert dis.rmse == 0.0
+        dis = tscompare.compare(empty_ts, ts)
+        print(dis)
+        assert np.isclose(dis.arf, 1/3)
+        assert np.isclose(dis.tpr, 2/3)
+        assert dis.dissimilarity == 1.0
+        assert dis.inverse_dissimilarity == 1.0
+        assert dis.total_span == (2.0, 3.0)
+        assert np.isnan(dis.rmse)
+
+
     @pytest.mark.parametrize(
         "pair",
         [(true_ext, true_ext), (true_simpl, true_ext), (true_simpl, true_unary)],
