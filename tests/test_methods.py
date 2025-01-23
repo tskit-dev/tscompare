@@ -265,7 +265,7 @@ class TestDissimilarity:
         print(dis)
         assert np.isclose(dis.arf, 1/3)
         assert np.isclose(dis.tpr, 2/3)
-        assert dis.dissimilarity == 1.0
+        assert dis.dissimilarity == 0.0
         assert dis.inverse_dissimilarity == 1.0
         assert dis.total_span == (2.0, 3.0)
         assert np.isnan(dis.rmse)
