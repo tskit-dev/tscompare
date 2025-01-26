@@ -249,8 +249,9 @@ class TestNodeMatching:
         true_spans_no_missing = np.array([1.0, 0.0, 1.0])
         assert np.all(np.isclose(node_spans_no_missing, true_spans_no_missing))
         node_spans_missing = tscompare.node_spans(empty_ts, include_missing=True)
-        true_spans_missing = np.full((3,),1.0)
+        true_spans_missing = np.full((3,), 1.0)
         assert np.all(np.isclose(node_spans_missing, true_spans_missing))
+
 
 class TestDissimilarity:
 
