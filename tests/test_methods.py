@@ -108,9 +108,14 @@ def naive_compare(ts, other, transform=None):
     if transform is None:
         transform = f
 
+    samples = ts.samples()
     node_span_ts = naive_node_span(ts)
     total_span_ts = np.sum(node_span_ts)
     shared_spans = naive_shared_node_spans(ts, other).toarray()
+    for i in samples:
+        for j in range(other.num_nodes):
+            if j != i:
+                shared_spans[i,j] = 0.0
     row_max_span = np.max(shared_spans, axis=1)
     total_match_span_ts = np.sum(row_max_span)
     assert len(row_max_span) == ts.num_nodes
@@ -130,7 +135,7 @@ def naive_compare(ts, other, transform=None):
     time_diffs = np.min(time_diff_matrix, axis=1)
     fd = np.isfinite(time_diffs)
     rmse = np.sqrt(
-        np.sum((node_span_ts * time_diffs)[fd] ** 2) / np.sum(node_span_ts[fd])
+        np.sum(node_span_ts[fd] * (time_diffs[fd] ** 2)) / np.sum(node_span_ts[fd])
     )
 
     # this matrix has in each row the span of its best match and zeros otherwise
@@ -662,3 +667,57 @@ class TestDissimilarity:
         assert np.isclose(dis.tpr, match_spans[1] / true_spans[1])
         assert np.isclose(dis.dissimilarity, true_spans[0] - match_spans[0])
         assert np.isclose(dis.inverse_dissimilarity, true_spans[1] - match_spans[1])
+        self.verify_compare(ts, other)
+
+    def test_n2_time_match(self):
+        def ex(samples=None, extra_node=False):
+            node_times = {
+                0: 0.0,
+                1: 0.0,
+                2: 0.0,
+            }
+            if extra_node:
+                node_times[3] = 100.0
+                node_times[4] = 200.0
+                node_times[5] = 300.0
+                # (p, c, l, r)
+                edges = [
+                    (3, 0, 0, 7),
+                    (3, 1, 0, 7),
+                    (4, 2, 0, 1),
+                    (4, 3, 0, 7),
+                    (5, 2, 1, 7),
+                    (5, 4, 1, 7)
+                ]
+            else:
+                node_times[3] = 50.0
+                node_times[4] = 200.0
+                edges = [
+                    (3, 0, 0, 7),
+                    (3, 1, 0, 7),
+                    (3, 2, 3, 7),
+                    (4, 2, 0, 3),
+                    (4, 3, 0, 7),
+                ]
+            tables = tskit.TableCollection(sequence_length=7)
+            if samples is None:
+                samples = [0, 1, 2]
+            for (
+                n,
+                t,
+            ) in node_times.items():
+                flags = tskit.NODE_IS_SAMPLE if n in samples else 0
+                tables.nodes.add_row(time=t, flags=flags)
+            for p, c, l, r in edges:
+                tables.edges.add_row(parent=p, child=c, left=l, right=r)
+            tables.sort()
+            ts = tables.tree_sequence()
+            if extra_node is True:
+                assert ts.num_edges == 6
+            if extra_node is False:
+                assert ts.num_edges == 5
+            return ts
+
+        ts = ex(extra_node=True)
+        other = ex(extra_node=False)
+        self.verify_compare(ts, other)

@@ -430,9 +430,12 @@ def compare(ts, other, transform=None):
     # If we did not require this, we could identify swapped samples,
     # but this is out of scope (people could detect this using
     # the shared spans matrix directly).
-    is_sample = np.full(ts.num_samples, False)
+    max_samples = max(ts.num_samples, other.num_samples)
+    is_sample = np.full(max(ts.num_nodes, other.num_nodes), False)
     is_sample[samples] = True
-    shared_spans.data[~np.logical_xor(is_sample[row_ind], is_sample[col_ind])] = 0.0
+    index_contains_sample = is_sample[row_ind]
+    index_not_equal = ~np.equal(row_ind, col_ind)
+    shared_spans.data[np.logical_and(is_sample[row_ind], index_not_equal)] = 0.0
     # Find all potential matches for a node based on max shared span length
     max_span = shared_spans.max(axis=1).toarray().flatten()
     total_match_n1_span = np.sum(max_span)  # <---- one thing to output
@@ -444,7 +447,6 @@ def compare(ts, other, transform=None):
     row_ind = np.repeat(
         np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
     )
-
     # now, make a matrix with differences in transformed times
     # in the places where shared_spans retains nonzero elements
     time_diff = shared_spans.copy()
@@ -484,3 +486,4 @@ def compare(ts, other, transform=None):
         rmse=rmse,
         transform=transform,
     )
+    
