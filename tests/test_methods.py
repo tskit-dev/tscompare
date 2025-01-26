@@ -231,6 +231,26 @@ class TestNodeMatching:
         assert np.allclose(time, ts.nodes_time)
         assert np.array_equal(hit, np.arange(ts.num_nodes))
 
+    def test_isolated_samples(self):
+        # ts as in test_very_simple; empty_ts without 2->1 branch:
+        #
+        # 1.00┊ 2   ┊
+        #     ┊ ┃   ┊
+        # 0.00┊ 0 1 ┊
+        #     0     1
+        ts = tskit.Tree.generate_star(2).tree_sequence
+        tables = ts.tables
+        tables.edges.clear()
+        tables.edges.add_row(parent=2, child=0, left=0, right=1)
+        empty_ts = tables.tree_sequence()
+        self.test_node_spans(empty_ts, include_missing=True)
+        self.test_node_spans(empty_ts, include_missing=False)
+        node_spans_no_missing = tscompare.node_spans(empty_ts, include_missing=False)
+        true_spans_no_missing = np.array([1.0, 0.0, 1.0])
+        assert np.all(np.isclose(node_spans_no_missing, true_spans_no_missing))
+        node_spans_missing = tscompare.node_spans(empty_ts, include_missing=True)
+        true_spans_missing = np.full((3,),1.0)
+        assert np.all(np.isclose(node_spans_missing, true_spans_missing))
 
 class TestDissimilarity:
 
