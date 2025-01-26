@@ -430,10 +430,8 @@ def compare(ts, other, transform=None):
     # If we did not require this, we could identify swapped samples,
     # but this is out of scope (people could detect this using
     # the shared spans matrix directly).
-    max_samples = max(ts.num_samples, other.num_samples)
     is_sample = np.full(max(ts.num_nodes, other.num_nodes), False)
     is_sample[samples] = True
-    index_contains_sample = is_sample[row_ind]
     index_not_equal = ~np.equal(row_ind, col_ind)
     shared_spans.data[np.logical_and(is_sample[row_ind], index_not_equal)] = 0.0
     # Find all potential matches for a node based on max shared span length
@@ -486,4 +484,3 @@ def compare(ts, other, transform=None):
         rmse=rmse,
         transform=transform,
     )
-    

@@ -115,7 +115,7 @@ def naive_compare(ts, other, transform=None):
     for i in samples:
         for j in range(other.num_nodes):
             if j != i:
-                shared_spans[i,j] = 0.0
+                shared_spans[i, j] = 0.0
     row_max_span = np.max(shared_spans, axis=1)
     total_match_span_ts = np.sum(row_max_span)
     assert len(row_max_span) == ts.num_nodes
@@ -687,7 +687,7 @@ class TestDissimilarity:
                     (4, 2, 0, 1),
                     (4, 3, 0, 7),
                     (5, 2, 1, 7),
-                    (5, 4, 1, 7)
+                    (5, 4, 1, 7),
                 ]
             else:
                 node_times[3] = 50.0
