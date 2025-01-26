@@ -202,9 +202,10 @@ class TestNodeMatching:
         "ts",
         [true_simpl, true_unary],
     )
-    def test_node_spans(self, ts):
-        eval_ns = tscompare.node_spans(ts)
-        naive_ns = naive_node_span(ts)
+    @pytest.mark.parametrize("include_missing", [True, False])
+    def test_node_spans(self, ts, include_missing):
+        eval_ns = tscompare.node_spans(ts, include_missing=include_missing)
+        naive_ns = naive_node_span(ts, include_missing=include_missing)
         assert np.allclose(eval_ns, naive_ns)
 
     @pytest.mark.parametrize("pair", combinations([true_simpl, true_unary], 2))

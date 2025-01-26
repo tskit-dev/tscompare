@@ -41,8 +41,8 @@ def node_spans(ts, include_missing=False):
     `include_missing` is `True` then the span of each sample is
     always equal to the sequence length.)
 
-    :param bool include_missing: Whether to include spans of missing
-        data. Only affects the span of sample nodes.
+    :param bool include_missing: Whether to include spans of nodes
+        on which they have missing data.
     """
     child_spans = np.bincount(
         ts.edges_child,
