@@ -298,18 +298,18 @@ class ARFResult:
     `arf`:
         The ARG Robinson-Foulds relative dissimilarity:
         the proportion of the total span of `ts` that is *not* represented in `other`.
-        This is: `dissimilarity / total_span[0]`
+        This is: `1 - matched_span[0] / total_span[0]`
 
     `tpr`:
         The "true proportion represented":
         the proportion of the total span of `other` that is represented in `ts`.
-        This is: `(total_span[0] - dissimilarity) / total_span[1]`
+        This is: `matched_span[1] / total_span[1]`
 
-    `dissimilarity`:
-        The total span of `ts` that is not represented in `other`.
-
-    `inverse_dissimilarity`:
-        The total span of `other` that is not represented in `ts`.
+    `matched_span`:
+        The total matched node spans between `ts` and `other`,
+        in order (`match`, `inverse_match`),
+        where `match` is the total span of `ts` that is represented in `other`,
+        and `inverse_match` is the total span of `other` that is represented in `ts`.
 
     `total_span`:
         The total of all node spans of the two tree sequences, in order (`ts`, `other`).
@@ -325,8 +325,7 @@ class ARFResult:
 
     arf: float
     tpr: float
-    dissimilarity: float
-    inverse_dissimilarity: float
+    matched_span: tuple
     total_span: tuple
     rmse: float
     transform: callable
@@ -338,8 +337,7 @@ class ARFResult:
         out = "Tree sequence comparison:\n"
         out += f"    ARF: {100 * self.arf:.2f}%\n"
         out += f"    TPR: {100 * self.tpr:.2f}%\n"
-        out += f"    dissimilarity: {self.dissimilarity}\n"
-        out += f"    inverse_dissimilarity: {self.inverse_dissimilarity}\n"
+        out += f"    matched_span: {self.matched_span}\n"
         out += (
             f"    total span (ts, other): {self.total_span[0]}, {self.total_span[1]}\n"
         )
@@ -357,26 +355,15 @@ def compare(ts, other, transform=None):
     `other` has the longest matching span using :func:`.shared_node_spans`.
     If there are multiple matches with the same longest shared span
     for a single node, the best match is the match that is closest in time.
-    This assumes that the samples are the same in both tree sequences:
+    This requires that the samples are the same in both tree sequences:
     in other words, if node `i` is a sample node in `ts`, then node `i` is
     also a sample node in `other` (and vice-versa).
 
-    For each node in `other` we compute the best matched span
-    as the maximum shared span amongst all nodes in `ts` which are its match.
-    The similarity will then not exceed the total node span of `other`,
-    bounding `tpr` to a proportion between 0 and 1.
+    For each node in `other` we compute the inverse matched span
+    as the maximum shared span amongst all nodes in `ts` for which that
+    node is their best match.
 
     Then, :class:`.ARFResult` contains:
-
-    - (`dissimilarity`)
-        The total "matching span", which is the total span of
-        all nodes in `ts` over which each node is ancestral to the same set of
-        samples as its best match in `other`.
-
-    - (`inverse_dissimiliarity`)
-        The total "inverse matching span", which is the total
-        span of all nodes in `other` over which each node is ancestral
-        to the same set of samples as its best match in `ts`.
 
     - (`arf`)
         The fraction of the total span of `ts` over which each nodes'
@@ -389,14 +376,21 @@ def compare(ts, other, transform=None):
         represented in `ts` (i.e., the total inverse matching span divided
         by the total span of `other`).
 
+    - (`matched_span`)
+        The total "matching" and "inverse matching" spans between `ts` and `other`.
+        The "matching span" is the total span of all nodes in `ts` over with each
+        node is ancestral to the same set of samples as its best match in `other`.
+        The "inverse matching span" is the total span of all nodes in `other` over
+        which each node is ancestral to the same set of sample as its best match in `ts`.
+
+    - (`total_span`)
+        The total node spans of `ts` and `other`.
+
     - (`rmse`)
         The root mean squared difference
         between the transformed times of the nodes in `ts`
         and transformed times of their best matching nodes in `other`,
         with the average weighted by the nodes' spans in `ts`.
-
-    - (`total_spans`)
-        The total node spans of `ts` and `other`.
 
     The callable `transform` is used to transform times before computing
     root-mean-squared error (see :class:`.ARFResult`); the default
@@ -477,9 +471,7 @@ def compare(ts, other, transform=None):
     return ARFResult(
         arf=1.0 - total_match_n1_span / total_span_ts,
         tpr=total_match_n2_span / total_span_other,
-        # matched_span=(total_match_n1_span, total_match_n2_span),
-        dissimilarity=total_span_ts - total_match_n1_span,
-        inverse_dissimilarity=total_span_other - total_match_n2_span,
+        matched_span=(total_match_n1_span, total_match_n2_span),
         total_span=(total_span_ts, total_span_other),
         rmse=rmse,
         transform=transform,

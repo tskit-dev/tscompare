@@ -98,7 +98,7 @@ def naive_node_span(ts, include_missing=False):
 
 def naive_compare(ts, other, transform=None):
     """
-    Ineffiecient but transparent function to compute dissimilarity
+    Ineffiecient but transparent function to compute matched spans
     and root-mean-square-error between two tree sequences.
     """
 
@@ -253,7 +253,7 @@ class TestNodeMatching:
         assert np.all(np.isclose(node_spans_missing, true_spans_missing))
 
 
-class TestDissimilarity:
+class TestMatchedSpans:
 
     def verify_compare(self, ts, other, transform=None):
         match_n1_span, match_n2_span, ts_span, other_span, rmse = naive_compare(
@@ -264,8 +264,8 @@ class TestDissimilarity:
         dis = tscompare.compare(ts, other, transform=transform)
         assert np.isclose(1.0 - match_n1_span / ts_span, dis.arf)
         assert np.isclose(match_n2_span / other_span, dis.tpr)
-        assert np.isclose(ts_span - match_n1_span, dis.dissimilarity)
-        assert np.isclose(other_span - match_n2_span, dis.inverse_dissimilarity)
+        assert np.isclose(match_n1_span, dis.matched_span[0])
+        assert np.isclose(match_n2_span, dis.matched_span[1])
         assert np.isclose(ts_span, dis.total_span[0])
         assert np.isclose(other_span, dis.total_span[1])
         assert np.isclose(rmse, dis.rmse), f"{rmse} != {dis.rmse}"
@@ -293,8 +293,8 @@ class TestDissimilarity:
         dis = tscompare.compare(ts, ts)
         assert dis.arf == 0.0
         assert dis.tpr == 1.0
-        assert dis.dissimilarity == 0.0
-        assert dis.inverse_dissimilarity == 0.0
+        assert dis.matched_span[0] == 3.0
+        assert dis.matched_span[1] == 3.0
         assert dis.total_span == (3.0, 3.0)
         assert dis.rmse == 0.0
 
@@ -313,16 +313,16 @@ class TestDissimilarity:
         dis = tscompare.compare(ts, empty_ts)
         assert np.isclose(dis.arf, 1 / 3)
         assert np.isclose(dis.tpr, 2 / 3)
-        assert dis.dissimilarity == 1.0
-        assert dis.inverse_dissimilarity == 1.0
+        assert dis.matched_span[0] == 2.0
+        assert dis.matched_span[1] == 2.0
         assert dis.total_span == (3.0, 3.0)
         assert dis.rmse == 0.0
         # note that here both 0 and 2 in empty_ts map to 0 in ts!
         dis = tscompare.compare(empty_ts, ts)
         assert dis.arf == 0.0
         assert np.isclose(dis.tpr, 2 / 3)
-        assert dis.dissimilarity == 0.0
-        assert dis.inverse_dissimilarity == 1.0
+        assert dis.matched_span[0] == 3.0
+        assert dis.matched_span[1] == 2.0
         assert dis.total_span == (3.0, 3.0)
         # here 0->0 (dt=0), 1->1 (dt=0), and (2->0) (dt=1)
         rmse = np.sqrt((1 / 3) * (0 + 0 + np.log(1 + 1) ** 2))
@@ -351,8 +351,8 @@ class TestDissimilarity:
         dis = tscompare.compare(ts1, ts2)
         assert dis.arf == 1.0
         assert dis.tpr == 0.0
-        assert dis.dissimilarity == 2.0
-        assert dis.inverse_dissimilarity == 2.0
+        assert dis.matched_span[0] == 0.0
+        assert dis.matched_span[1] == 0.0
         assert dis.total_span == (2.0, 2.0)
         assert np.isnan(dis.rmse)
 
@@ -371,9 +371,9 @@ class TestDissimilarity:
         "pair",
         [(true_ext, true_ext), (true_simpl, true_ext), (true_simpl, true_unary)],
     )
-    def test_zero_dissimilarity(self, pair):
+    def test_zero_matched_span(self, pair):
         dis = tscompare.compare(pair[0], pair[1])
-        assert np.isclose(dis.dissimilarity, 0)
+        assert np.isclose(dis.matched_span[0], dis.total_span[0])
         assert np.isclose(dis.arf, 0)
         assert np.isclose(dis.rmse, 0)
 
@@ -381,15 +381,15 @@ class TestDissimilarity:
         "pair",
         [(true_ext, true_ext), (true_simpl, true_unary)],
     )
-    def test_inverse_dissimilarity(self, pair):
+    def test_inverse_matched_span(self, pair):
         dis = tscompare.compare(pair[1], pair[0])
         assert np.isclose(dis.tpr, 1)
-        assert np.isclose(dis.inverse_dissimilarity, 0)
+        assert np.isclose(dis.matched_span[1], dis.total_span[1])
 
     def test_transform(self):
         dis1 = tscompare.compare(true_simpl, true_simpl, transform=lambda t: t)
         dis2 = tscompare.compare(true_simpl, true_simpl, transform=None)
-        assert dis1.dissimilarity == dis2.dissimilarity
+        assert dis1.matched_span[0] == dis2.matched_span[0]
         assert dis1.rmse == dis2.rmse
         self.verify_compare(true_simpl, true_ext, transform=lambda t: 1 / (1 + t))
 
@@ -397,7 +397,7 @@ class TestDissimilarity:
         self, samples=None, time=False, span=False, no_match=False, extra_match=False
     ):
         # A simple tree sequence we can use to properly test various
-        # dissimilarity and MSRE values.
+        # matched span and MSRE values.
         #
         #    6          6      6
         #  +-+-+      +-+-+  +-+-+
@@ -576,11 +576,12 @@ class TestDissimilarity:
         self.verify_compare(ts, other)
         self.verify_compare(ts, other, transform=lambda t: np.sqrt(1 + t))
 
-    def test_dissimilarity_value(self):
+    def test_matched_span_value(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True)
         dis = tscompare.compare(ts, other, transform=None)
         assert np.isclose(dis.arf, 4 / 46)
+        assert np.isclose(dis.total_span[0] - dis.matched_span[0], 4.0)
         assert np.isclose(dis.rmse, 0.0)
 
     def test_rmse(self):
@@ -603,7 +604,7 @@ class TestDissimilarity:
         )
         assert np.isclose(dis.arf, 0.0)
         assert np.isclose(dis.tpr, 1.0)
-        assert np.isclose(dis.dissimilarity, 0.0)
+        assert np.isclose(dis.matched_span[0], true_total_span)
         assert np.isclose(dis.rmse, true_rmse)
 
     def test_value_and_error(self):
@@ -625,8 +626,8 @@ class TestDissimilarity:
         )
         assert np.isclose(dis.arf, 4 / true_total_spans[0])
         assert np.isclose(dis.tpr, (true_total_spans[1] - 5) / true_total_spans[1])
-        assert np.isclose(dis.dissimilarity, 4)
-        assert np.isclose(dis.inverse_dissimilarity, 5)
+        assert np.isclose(dis.total_span[0] - dis.matched_span[0], 4)
+        assert np.isclose(dis.total_span[1] - dis.matched_span[1], 5)
         assert np.isclose(dis.rmse, true_rmse)
 
     def test_extra_match(self):
@@ -638,8 +639,10 @@ class TestDissimilarity:
         true_spans = (54, 46)
         assert np.isclose(dis.arf, 1 - n1_match_span / true_spans[0])
         assert np.isclose(dis.tpr, n2_match_span / true_spans[1])
-        assert np.isclose(dis.dissimilarity, true_spans[0] - n1_match_span)
-        assert np.isclose(dis.inverse_dissimilarity, true_spans[1] - n2_match_span)
+        assert np.isclose(dis.matched_span[0], n1_match_span)
+        assert np.isclose(dis.matched_span[1], n2_match_span)
+        assert np.isclose(dis.total_span[0], true_spans[0])
+        assert np.isclose(dis.total_span[1], true_spans[1])
 
     def get_n2_match_ex(self, samples=None, extra_nodes=False):
         node_times = {
@@ -687,8 +690,10 @@ class TestDissimilarity:
         match_spans = (15, 15)
         assert np.isclose(dis.arf, 1 - match_spans[0] / true_spans[0])
         assert np.isclose(dis.tpr, match_spans[1] / true_spans[1])
-        assert np.isclose(dis.dissimilarity, true_spans[0] - match_spans[0])
-        assert np.isclose(dis.inverse_dissimilarity, true_spans[1] - match_spans[1])
+        assert np.isclose(dis.matched_span[0], match_spans[0])
+        assert np.isclose(dis.matched_span[1], match_spans[1])
+        assert np.isclose(dis.total_span[0], true_spans[0])
+        assert np.isclose(dis.total_span[1], true_spans[1])
         self.verify_compare(ts, other)
 
     def test_n2_time_match(self):
