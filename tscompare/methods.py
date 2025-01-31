@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2024 Tskit Developers
+# Copyright (c) 2025 Tskit Developers
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -32,12 +32,17 @@ import scipy.sparse
 import tskit
 
 
-def node_spans(ts):
+def node_spans(ts, include_missing=False):
     """
     Returns the array of "node spans", i.e., the `j`th entry gives
-    the total span over which node `j` is in the tree sequence
-    (i.e., does not have 'missing data' there).
+    the total span over which node `j` is in the tree sequence.
+    Sample nodes that are isolated are "missing data"; inclusion
+    of these spans are controlled by `include_missing`. (If
+    `include_missing` is `True` then the span of each sample is
+    always equal to the sequence length.)
 
+    :param bool include_missing: Whether to include spans of nodes
+        on which they have missing data.
     """
     child_spans = np.bincount(
         ts.edges_child,
@@ -48,7 +53,7 @@ def node_spans(ts):
         span = t.span
         for r in t.roots:
             # do this check to exempt 'missing data'
-            if t.num_children(r) > 0:
+            if include_missing or (t.num_children(r) > 0):
                 child_spans[r] += span
     return child_spans
 
@@ -170,10 +175,12 @@ def shared_node_spans(ts, other):
     Calculate the spans over which pairs of nodes in two tree sequences are
     ancestral to identical sets of samples.
 
-
     Returns a sparse matrix where rows correspond to nodes in `ts` and columns
     correspond to nodes in `other`, and whose value is the total amount of span
     over which the set of samples inheriting from the two nodes is identical.
+
+    The shared span of a sample node with itself includes spans over which it
+    has missing data.
 
     :return: A sparse matrix of class `scipy.sparse.csr_matrix`.
     """
@@ -291,15 +298,18 @@ class ARFResult:
     `arf`:
         The ARG Robinson-Foulds relative dissimilarity:
         the proportion of the total span of `ts` that is *not* represented in `other`.
-        This is: `dissimilarity / total_span[0]`
+        This is: `1 - matched_span[0] / total_span[0]`
 
     `tpr`:
         The "true proportion represented":
         the proportion of the total span of `other` that is represented in `ts`.
-        This is: `(total_span[0] - dissimilarity) / total_span[1]`
+        This is: `matched_span[1] / total_span[1]`
 
-    `dissimilarity`:
-        The total span of `ts` that is not represented in `other`.
+    `matched_span`:
+        The total matched node spans between `ts` and `other`,
+        in order (`match`, `inverse_match`),
+        where `match` is the total span of `ts` that is represented in `other`,
+        and `inverse_match` is the total span of `other` that is represented in `ts`.
 
     `total_span`:
         The total of all node spans of the two tree sequences, in order (`ts`, `other`).
@@ -315,7 +325,7 @@ class ARFResult:
 
     arf: float
     tpr: float
-    dissimilarity: float
+    matched_span: tuple
     total_span: tuple
     rmse: float
     transform: callable
@@ -327,7 +337,7 @@ class ARFResult:
         out = "Tree sequence comparison:\n"
         out += f"    ARF: {100 * self.arf:.2f}%\n"
         out += f"    TPR: {100 * self.tpr:.2f}%\n"
-        out += f"    dissimilarity: {self.dissimilarity}\n"
+        out += f"    matched_span: {self.matched_span}\n"
         out += (
             f"    total span (ts, other): {self.total_span[0]}, {self.total_span[1]}\n"
         )
@@ -337,23 +347,23 @@ class ARFResult:
 
 def compare(ts, other, transform=None):
     """
-    For two tree sequences `ts` and `other`,
-    this method returns an object of type :class:`.ARFResult`.
-    The values reported summarize the degree to which nodes in `ts`
-    "match" corresponding nodes in `other`.
+    For two tree sequences `ts` and `other`, this method returns an object of
+    type :class:`.ARFResult`.  The values reported summarize the degree to
+    which nodes in `ts` "match" corresponding nodes in `other`.
 
-    To match nodes,
-    for each node in `ts`, the best matching node(s) from `other`
-    has the longest matching span using :func:`.shared_node_spans`.
+    To match nodes, for each node in `ts`, the best matching node(s) from
+    `other` has the longest matching span using :func:`.shared_node_spans`.
     If there are multiple matches with the same longest shared span
     for a single node, the best match is the match that is closest in time.
+    This requires that the samples are the same in both tree sequences:
+    in other words, if node `i` is a sample node in `ts`, then node `i` is
+    also a sample node in `other` (and vice-versa).
+
+    For each node in `other` we compute the inverse matched span
+    as the maximum shared span amongst all nodes in `ts` for which that
+    node is their best match.
 
     Then, :class:`.ARFResult` contains:
-
-    - (`dissimilarity`)
-        The total "matching span", which is the total span of
-        all nodes in `ts` over which each node is ancestral to the same set of
-        samples as its best match in `other`.
 
     - (`arf`)
         The fraction of the total span of `ts` over which each nodes'
@@ -363,17 +373,24 @@ def compare(ts, other, transform=None):
 
     - (`tpr`)
         The proportion of the span in `other` that is correctly
-        represented in `ts` (i.e., the total matching span divided
+        represented in `ts` (i.e., the total inverse matching span divided
         by the total span of `other`).
+
+    - (`matched_span`)
+        The total "matching" and "inverse matching" spans between `ts` and `other`.
+        The "matching span" is the total span of all nodes in `ts` over with each
+        node is ancestral to the same set of samples as its best match in `other`.
+        The "inverse matching span" is the total span of all nodes in `other` over
+        which each node is ancestral to the same set of sample as its best match in `ts`.
+
+    - (`total_span`)
+        The total node spans of `ts` and `other`.
 
     - (`rmse`)
         The root mean squared difference
         between the transformed times of the nodes in `ts`
         and transformed times of their best matching nodes in `other`,
         with the average weighted by the nodes' spans in `ts`.
-
-    - (`total_spans`)
-        The total node spans of `ts` and `other`.
 
     The callable `transform` is used to transform times before computing
     root-mean-squared error (see :class:`.ARFResult`); the default
@@ -387,65 +404,74 @@ def compare(ts, other, transform=None):
     :rtype: ARFResult
     """
 
+    samples = ts.samples()
+    if ts.num_samples != other.num_samples or np.any(samples != other.samples()):
+        raise ValueError("Samples in `ts` and `other` must agree.")
+
     def f(t):
         return np.log(1 + t)
 
     if transform is None:
         transform = f
 
+    ts_node_spans = node_spans(ts, include_missing=True)
     shared_spans = shared_node_spans(ts, other)
-    # Find all potential matches for a node based on max shared span length
-    max_span = shared_spans.max(axis=1).toarray().flatten()
     col_ind = shared_spans.indices
     row_ind = np.repeat(
         np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
     )
-    # mask to find all potential node matches
-    match = shared_spans.data == max_span[row_ind]
-    # scale with difference in node times
-    # determine best matches with the best_match_matrix
-    ts_times = ts.nodes_time[row_ind[match]]
-    other_times = other.nodes_time[col_ind[match]]
-    time_difference = np.absolute(
+    # We require that the samples are the same in both trees!
+    # If we did not require this, we could identify swapped samples,
+    # but this is out of scope (people could detect this using
+    # the shared spans matrix directly).
+    is_sample = np.full(max(ts.num_nodes, other.num_nodes), False)
+    is_sample[samples] = True
+    index_not_equal = ~np.equal(row_ind, col_ind)
+    shared_spans.data[np.logical_and(is_sample[row_ind], index_not_equal)] = 0.0
+    # Find all potential matches for a node based on max shared span length
+    max_span = shared_spans.max(axis=1).toarray().flatten()
+    total_match_n1_span = np.sum(max_span)  # <---- one thing to output
+    # zero out everything that's not a row max
+    shared_spans.data[shared_spans.data != max_span[row_ind]] = 0.0
+    # now re-sparsify the matrix: but, beware! don't do this again later.
+    shared_spans.eliminate_zeros()
+    col_ind = shared_spans.indices
+    row_ind = np.repeat(
+        np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
+    )
+    # now, make a matrix with differences in transformed times
+    # in the places where shared_spans retains nonzero elements
+    time_diff = shared_spans.copy()
+    ts_times = ts.nodes_time[row_ind]
+    other_times = other.nodes_time[col_ind]
+    time_diff.data[:] = np.absolute(
         np.asarray(transform(ts_times) - transform(other_times))
     )
-    # If a node x in `ts` has no match then we set time_difference to zero
-    # This node then does not effect the rmse
-    for j in range(len(shared_spans.data[match])):
-        if shared_spans.data[match][j] == 0:
-            time_difference[j] = 0.0
-    # If two nodes have the same time, then
-    # time_difference is zero, which causes problems with argmin
-    # Instead we store data as 1/(1+x) and find argmax
-    best_match_matrix = scipy.sparse.coo_matrix(
-        (
-            1 / (1 + time_difference),
-            (row_ind[match], col_ind[match]),
-        ),
-        shape=(ts.num_nodes, other.num_nodes),
-    )
-    # Between each pair of nodes, find the maximum shared span
-    best_match = best_match_matrix.argmax(axis=1).A1
-    best_match_spans = shared_spans[np.arange(len(best_match)), best_match].reshape(-1)
-    total_match_span = np.sum(best_match_spans)
-    ts_node_spans = node_spans(ts)
+    # "explicit=True" takes the min of only the entries explicitly represented
+    dt = time_diff.min(axis=1, explicit=True).toarray().flatten()
+    has_match = max_span != 0
+    if np.any(has_match):
+        rmse = np.sqrt(
+            np.sum(dt[has_match] ** 2 * ts_node_spans[has_match])
+            / np.sum(ts_node_spans[has_match])
+        )
+        # ^-- another thing to output
+    else:
+        rmse = np.nan
+
+    # next, zero out also those non-best-time-match elements
+    shared_spans.data[time_diff.data != dt[row_ind]] = 0.0
+    # and, find sum of column maxima
+    total_match_n2_span = shared_spans.max(
+        axis=0
+    ).sum()  # <--- the other thing we return
+
     total_span_ts = np.sum(ts_node_spans)
-    total_span_other = np.sum(node_spans(other))
-    # Compute the root-mean-square difference in transformed time
-    # with the average weighted by span in ts
-    time_matrix = scipy.sparse.csr_matrix(
-        (time_difference, (row_ind[match], col_ind[match])),
-        shape=(ts.num_nodes, other.num_nodes),
-    )
-    time_discrepancies = np.asarray(
-        time_matrix[np.arange(len(best_match)), best_match].reshape(-1)
-    )
-    product = np.multiply((time_discrepancies**2), ts_node_spans)
-    rmse = np.sqrt(np.sum(product) / total_span_ts)
+    total_span_other = np.sum(node_spans(other, include_missing=True))
     return ARFResult(
-        arf=1.0 - total_match_span / total_span_ts,
-        tpr=total_match_span / total_span_other,
-        dissimilarity=total_span_ts - total_match_span,
+        arf=1.0 - total_match_n1_span / total_span_ts,
+        tpr=total_match_n2_span / total_span_other,
+        matched_span=(total_match_n1_span, total_match_n2_span),
         total_span=(total_span_ts, total_span_other),
         rmse=rmse,
         transform=transform,
