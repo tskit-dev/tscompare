@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python: [ "3.10", 3.12 ]
+        python-version: [ "3.10", "3.13" ]
         os:  [ macos-latest, ubuntu-24.04, windows-latest ]
     defaults:
       run:
@@ -37,48 +37,17 @@ jobs:
         uses: styfle/cancel-workflow-action@0.12.1
         with:
           access_token: ${{ github.token }}
-
-      - name: Checkout
-        uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v4.2.2
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v6
         with:
-          submodules: true
-
-      - name: Cache conda and dependencies
-        id: cache
-        uses: actions/cache@v4.2.2
-        with:
-          path: ${{ env.CONDA }}/envs
-          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.python}}-conda-${{ hashFiles('requirements/CI-tests-conda/requirements.txt') }}-${{ hashFiles('requirements/CI-tests-pip/requirements.txt') }}
-
-      - name: Install Conda
-        uses: conda-incubator/setup-miniconda@v3.1.1
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          activate-environment: anaconda-client-env
-          python-version: ${{ matrix.python }}
-          channels: conda-forge, anaconda
-          channel-priority: strict
-          auto-update-conda: true
-
-      - name: Fix windows .profile
-        if: steps.cache.outputs.cache-hit != 'true' && matrix.os == 'windows-latest'
+          python-version: ${{ matrix.python-version }}
+          version: "0.8.15"
+      
+      - name: Install dependencies
         run: |
-          cp ~/.bash_profile ~/.profile
-
-      - name: Install conda deps
-        if: steps.cache.outputs.cache-hit != 'true'
-        shell: bash -l {0} #We need a login shell to get conda
-        run: conda install --yes --file=requirements/CI-tests-conda/requirements.txt
-
-      - name: Install pip deps
-        if: steps.cache.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: | 
-          pip install -r requirements/CI-tests-pip/requirements.txt
-          pip install .
-
-      - name: Run tests
+          uv venv
+          uv pip install -e ".[test]"
+      - name: Test with pytest
         run: |
-          source ~/.profile
-          conda activate anaconda-client-env
-          pytest -xvs -n0
+          uv run --no-sync python -m pytest --cov=tscompare --cov-report=xml --cov-branch -n 0 tests
