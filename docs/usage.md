@@ -52,8 +52,8 @@ Now, we can ask: how much of the inferred tree sequence is not "correct":
 in other words, how much of it is not represented in the true tree sequence?
 (Here, part of an ancestral node's span is "correct" if it is ancestral
 to the same set of samples.)
-We do this with {func}`.compare`:
+We do this with {func}`.haplotype_arf`:
 ```{code-cell}
-dis = tscompare.compare(orig_ts, inferred_ts)
+dis = tscompare.haplotype_arf(orig_ts, inferred_ts)
 print(dis)
 ```

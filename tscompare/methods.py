@@ -261,7 +261,7 @@ def shared_node_spans(ts, other):
 def match_node_ages(ts, other):
     """
         For each node in `ts`, return the age of a matched node from `other`.  Node
-        matching is accomplished as described in :func:`.compare`.
+        matching is accomplished as described in :func:`.haplotype_arf`.
 
 
         Returns a tuple of three vectors of length `ts.num_nodes`, in this order:
@@ -290,7 +290,7 @@ def match_node_ages(ts, other):
 @dataclass
 class ARFResult:
     """
-    The result of a call to tscompare.compare(ts, other),
+    The result of a call to tscompare.haplotype_arf(ts, other),
     returning metrics associated with the ARG Robinson-Foulds
     measures of similarity and dissimilarity.
     This contains:
@@ -345,7 +345,7 @@ class ARFResult:
         return out
 
 
-def compare(ts, other, transform=None):
+def haplotype_arf(ts, other, transform=None):
     """
     For two tree sequences `ts` and `other`, this method returns an object of
     type :class:`.ARFResult`.  The values reported summarize the degree to
@@ -378,7 +378,7 @@ def compare(ts, other, transform=None):
 
     - (`matched_span`)
         The total "matching" and "inverse matching" spans between `ts` and `other`.
-        The "matching span" is the total span of all nodes in `ts` over with each
+        The "matching span" is the total span of all nodes in `ts` over which each
         node is ancestral to the same set of samples as its best match in `other`.
         The "inverse matching span" is the total span of all nodes in `other` over
         which each node is ancestral to the same set of sample as its best match in `ts`.
