@@ -284,7 +284,7 @@ class TestMatchedSpans:
         with pytest.raises(ValueError, match="Samples.*agree"):
             tscompare.compare(ts1, ts2)
 
-    def test_very_simple(self):
+    def test_self_simple(self):
         # 1.00┊  2  ┊
         #     ┊ ┏┻┓ ┊
         # 0.00┊ 0 1 ┊
@@ -297,6 +297,40 @@ class TestMatchedSpans:
         assert dis.matched_span[1] == 3.0
         assert dis.total_span == (3.0, 3.0)
         assert dis.rmse == 0.0
+
+    def test_very_simple(self):
+        #    ts1       :     ts2
+        # 1.00┊  3  ┊  :  1.00┊  3  ┊
+        #     ┊ ┏┻┓ ┊  :      ┊ ┏┻┓ ┊
+        # 0.50┊ ┃ ┃ ┊  :  0.50┊ 2 ┃ ┊
+        #     ┊ ┃ ┃ ┊  :      ┊ ┃ ┃ ┊
+        # 0.00┊ 0 1 ┊  :  0.00┊ 0 1 ┊
+        #     0     1  :      0     1
+        t = tskit.TableCollection(sequence_length=1.0)
+        a = t.nodes.add_row(time=0, flags=1)
+        b = t.nodes.add_row(time=0, flags=1)
+        r = t.nodes.add_row(time=1)
+        t.edges.add_row(parent=r, child=a, left=0, right=1)
+        t.edges.add_row(parent=r, child=b, left=0, right=1)
+        t.sort()
+        ts1 = t.tree_sequence()
+        t.edges.clear()
+        c = t.nodes.add_row(time=0.5)
+        t.edges.add_row(parent=r, child=c, left=0, right=1)
+        t.edges.add_row(parent=c, child=a, left=0, right=1)
+        t.edges.add_row(parent=r, child=b, left=0, right=1)
+        t.sort()
+        ts2 = t.tree_sequence()
+        dis12 = tscompare.compare(ts1, ts2)
+        assert dis12.total_span == (3.0, 4.0)
+        assert dis12.matched_span == (3.0, 3.0)
+        assert dis12.arf == 1 - 3.0 / 3.0
+        assert dis12.tpr == 3.0 / 4.0  # the only non-zero diff
+        dis21 = tscompare.compare(ts2, ts1)
+        assert dis21.total_span == (4.0, 3.0)
+        assert dis21.matched_span == (4.0, 3.0)
+        assert dis21.arf == 1 - 4.0 / 4.0
+        assert dis21.tpr == 3.0 / 3.0
 
     def test_missing_data(self):
         # ts as in test_very_simple; empty_ts without 2->1 branch:
