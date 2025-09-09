@@ -23,6 +23,7 @@
 Tools for comparing node times between tree sequences with different node sets
 """
 import copy
+import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import product
@@ -30,6 +31,16 @@ from itertools import product
 import numpy as np
 import scipy.sparse
 import tskit
+
+
+def compare(*args, **kwargs):
+    warnings.warn(
+        "compare() is deprecated and will be removed in the future; "
+        "please use haplotype_arf() instead.",
+        DeprecationWarning,
+        stacklevel=1,
+    )
+    return haplotype_arf(*args, **kwargs)
 
 
 def node_spans(ts, include_missing=False):
@@ -416,39 +427,51 @@ def haplotype_arf(ts, other, transform=None):
 
     ts_node_spans = node_spans(ts, include_missing=True)
     shared_spans = shared_node_spans(ts, other)
-    col_ind = shared_spans.indices
-    row_ind = np.repeat(
-        np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
-    )
-    # We require that the samples are the same in both trees!
-    # If we did not require this, we could identify swapped samples,
-    # but this is out of scope (people could detect this using
-    # the shared spans matrix directly).
-    is_sample = np.full(max(ts.num_nodes, other.num_nodes), False)
-    is_sample[samples] = True
-    index_not_equal = ~np.equal(row_ind, col_ind)
-    shared_spans.data[np.logical_and(is_sample[row_ind], index_not_equal)] = 0.0
-    # Find all potential matches for a node based on max shared span length
-    max_span = shared_spans.max(axis=1).toarray().flatten()
-    total_match_n1_span = np.sum(max_span)  # <---- one thing to output
-    # zero out everything that's not a row max
-    shared_spans.data[shared_spans.data != max_span[row_ind]] = 0.0
-    # now re-sparsify the matrix: but, beware! don't do this again later.
-    shared_spans.eliminate_zeros()
-    col_ind = shared_spans.indices
-    row_ind = np.repeat(
-        np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
-    )
-    # now, make a matrix with differences in transformed times
-    # in the places where shared_spans retains nonzero elements
-    time_diff = shared_spans.copy()
-    ts_times = ts.nodes_time[row_ind]
-    other_times = other.nodes_time[col_ind]
-    time_diff.data[:] = np.absolute(
-        np.asarray(transform(ts_times) - transform(other_times))
-    )
-    # "explicit=True" takes the min of only the entries explicitly represented
-    dt = time_diff.min(axis=1, explicit=True).toarray().flatten()
+    if min(ts.num_nodes, other.num_nodes) > 0:
+        col_ind = shared_spans.indices
+        row_ind = np.repeat(
+            np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
+        )
+        # We require that the samples are the same in both trees!
+        # If we did not require this, we could identify swapped samples,
+        # but this is out of scope (people could detect this using
+        # the shared spans matrix directly).
+        is_sample = np.full(max(ts.num_nodes, other.num_nodes), False)
+        is_sample[samples] = True
+        index_not_equal = ~np.equal(row_ind, col_ind)
+        shared_spans.data[np.logical_and(is_sample[row_ind], index_not_equal)] = 0.0
+        # Find all potential matches for a node based on max shared span length
+        max_span = shared_spans.max(axis=1).toarray().flatten()
+        total_match_n1_span = np.sum(max_span)  # <---- one thing to output
+        # zero out everything that's not a row max
+        shared_spans.data[shared_spans.data != max_span[row_ind]] = 0.0
+        # now re-sparsify the matrix: but, beware! don't do this again later.
+        shared_spans.eliminate_zeros()
+        col_ind = shared_spans.indices
+        row_ind = np.repeat(
+            np.arange(shared_spans.shape[0]), repeats=np.diff(shared_spans.indptr)
+        )
+        # now, make a matrix with differences in transformed times
+        # in the places where shared_spans retains nonzero elements
+        time_diff = shared_spans.copy()
+        ts_times = ts.nodes_time[row_ind]
+        other_times = other.nodes_time[col_ind]
+        time_diff.data[:] = np.absolute(
+            np.asarray(transform(ts_times) - transform(other_times))
+        )
+        # "explicit=True" takes the min of only the entries explicitly represented
+        dt = time_diff.min(axis=1, explicit=True).toarray().flatten()
+        # next, zero out also those non-best-time-match elements
+        shared_spans.data[time_diff.data != dt[row_ind]] = 0.0
+        # and, find sum of column maxima
+        total_match_n2_span = shared_spans.max(
+            axis=0
+        ).sum()  # <--- the other thing we return
+    else:
+        max_span = 0
+        total_match_n1_span = 0
+        total_match_n2_span = 0
+
     has_match = max_span != 0
     if np.any(has_match):
         rmse = np.sqrt(
@@ -458,13 +481,6 @@ def haplotype_arf(ts, other, transform=None):
         # ^-- another thing to output
     else:
         rmse = np.nan
-
-    # next, zero out also those non-best-time-match elements
-    shared_spans.data[time_diff.data != dt[row_ind]] = 0.0
-    # and, find sum of column maxima
-    total_match_n2_span = shared_spans.max(
-        axis=0
-    ).sum()  # <--- the other thing we return
 
     total_span_ts = np.sum(ts_node_spans)
     total_span_other = np.sum(node_spans(other, include_missing=True))

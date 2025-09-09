@@ -198,6 +198,13 @@ class TestCladeMap:
 
 class TestNodeMatching:
 
+    def test_empty_ts(self):
+        ts = tskit.TableCollection(sequence_length=1.0).tree_sequence()
+        x = tscompare.node_spans(ts)
+        assert len(x) == 0
+        x = tscompare.shared_node_spans(ts, ts)
+        assert x.shape == (0, 0)
+
     @pytest.mark.parametrize(
         "ts",
         [true_simpl, true_unary],
@@ -253,6 +260,15 @@ class TestNodeMatching:
         assert np.all(np.isclose(node_spans_missing, true_spans_missing))
 
 
+class TestDeprecation:
+
+    @pytest.mark.filterwarnings("ignore:invalid value encountered in scalar divide")
+    def test_compare(self):
+        ts = tskit.TableCollection(sequence_length=1.0).tree_sequence()
+        with pytest.warns(DeprecationWarning):
+            _ = tscompare.compare(ts, ts)
+
+
 class TestMatchedSpans:
 
     def verify_compare(self, ts, other, transform=None):
@@ -269,6 +285,16 @@ class TestMatchedSpans:
         assert np.isclose(ts_span, dis.total_span[0])
         assert np.isclose(other_span, dis.total_span[1])
         assert np.isclose(rmse, dis.rmse), f"{rmse} != {dis.rmse}"
+
+    @pytest.mark.filterwarnings("ignore:invalid value encountered in scalar divide")
+    def test_empty_ts(self):
+        ts = tskit.TableCollection(sequence_length=1.0).tree_sequence()
+        x = tscompare.haplotype_arf(ts, ts)
+        assert np.isnan(x.arf)
+        assert np.isnan(x.tpr)
+        assert np.isnan(x.rmse)
+        assert x.matched_span == (0, 0)
+        assert x.total_span == (0, 0)
 
     def test_samples_dont_match(self):
         ts1 = tskit.Tree.generate_star(2).tree_sequence
