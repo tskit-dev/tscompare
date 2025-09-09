@@ -6,6 +6,7 @@ Final release to go with publication of Fritze et al.
 
 **Breaking change:** renamed `compare` to `haplotype_arf`, because there are other comparison
 methods that we might implement here, and each would return a different object.
+For now, `compare` does the same thing but raises a DeprecationWarning.
 
 ## [0.1] - 2024-12-14
 

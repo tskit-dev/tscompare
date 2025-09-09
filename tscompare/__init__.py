@@ -24,6 +24,7 @@ Tools for comparing tree sequences
 """
 from .methods import ARFResult  # noqa F401
 from .methods import CladeMap  # noqa F401
+from .methods import compare  # noqa F401
 from .methods import haplotype_arf  # noqa F401
 from .methods import match_node_ages  # noqa F401
 from .methods import node_spans  # noqa F401
