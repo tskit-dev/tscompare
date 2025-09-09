@@ -1,4 +1,8 @@
 # tscompare
-Utilities for comparing tree sequences
 
-**Under construction, 1 December 2024:** this code will be available very soon.
+Utilities for comparing ARGs in tree sequence format;
+at present this only contains tools described in;
+[Fritze et al, "A forest is more than its trees: haplotypes and ancestral recombination graphs"](https://doi.org/10.1101/2024.11.30.626138);
+in the future this might have more methods.
+
+

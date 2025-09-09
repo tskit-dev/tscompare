@@ -261,7 +261,7 @@ class TestMatchedSpans:
             other,
             transform=transform,
         )
-        dis = tscompare.compare(ts, other, transform=transform)
+        dis = tscompare.haplotype_arf(ts, other, transform=transform)
         assert np.isclose(1.0 - match_n1_span / ts_span, dis.arf)
         assert np.isclose(match_n2_span / other_span, dis.tpr)
         assert np.isclose(match_n1_span, dis.matched_span[0])
@@ -274,7 +274,7 @@ class TestMatchedSpans:
         ts1 = tskit.Tree.generate_star(2).tree_sequence
         ts2 = tskit.Tree.generate_star(3).tree_sequence
         with pytest.raises(ValueError, match="Samples.*agree"):
-            tscompare.compare(ts1, ts2)
+            tscompare.haplotype_arf(ts1, ts2)
         tables = ts1.dump_tables()
         tables.nodes.clear()
         tables.nodes.add_row(time=0, flags=tskit.NODE_IS_SAMPLE)
@@ -282,7 +282,7 @@ class TestMatchedSpans:
         tables.nodes.add_row(time=1, flags=tskit.NODE_IS_SAMPLE)
         ts2 = tables.tree_sequence()
         with pytest.raises(ValueError, match="Samples.*agree"):
-            tscompare.compare(ts1, ts2)
+            tscompare.haplotype_arf(ts1, ts2)
 
     def test_self_simple(self):
         # 1.00┊  2  ┊
@@ -290,7 +290,7 @@ class TestMatchedSpans:
         # 0.00┊ 0 1 ┊
         #     0     1
         ts = tskit.Tree.generate_star(2).tree_sequence
-        dis = tscompare.compare(ts, ts)
+        dis = tscompare.haplotype_arf(ts, ts)
         assert dis.arf == 0.0
         assert dis.tpr == 1.0
         assert dis.matched_span[0] == 3.0
@@ -321,12 +321,12 @@ class TestMatchedSpans:
         t.edges.add_row(parent=r, child=b, left=0, right=1)
         t.sort()
         ts2 = t.tree_sequence()
-        dis12 = tscompare.compare(ts1, ts2)
+        dis12 = tscompare.haplotype_arf(ts1, ts2)
         assert dis12.total_span == (3.0, 4.0)
         assert dis12.matched_span == (3.0, 3.0)
         assert dis12.arf == 1 - 3.0 / 3.0
         assert dis12.tpr == 3.0 / 4.0  # the only non-zero diff
-        dis21 = tscompare.compare(ts2, ts1)
+        dis21 = tscompare.haplotype_arf(ts2, ts1)
         assert dis21.total_span == (4.0, 3.0)
         assert dis21.matched_span == (4.0, 3.0)
         assert dis21.arf == 1 - 4.0 / 4.0
@@ -344,7 +344,7 @@ class TestMatchedSpans:
         tables.edges.clear()
         tables.edges.add_row(parent=2, child=0, left=0, right=1)
         empty_ts = tables.tree_sequence()
-        dis = tscompare.compare(ts, empty_ts)
+        dis = tscompare.haplotype_arf(ts, empty_ts)
         assert np.isclose(dis.arf, 1 / 3)
         assert np.isclose(dis.tpr, 2 / 3)
         assert dis.matched_span[0] == 2.0
@@ -352,7 +352,7 @@ class TestMatchedSpans:
         assert dis.total_span == (3.0, 3.0)
         assert dis.rmse == 0.0
         # note that here both 0 and 2 in empty_ts map to 0 in ts!
-        dis = tscompare.compare(empty_ts, ts)
+        dis = tscompare.haplotype_arf(empty_ts, ts)
         assert dis.arf == 0.0
         assert np.isclose(dis.tpr, 2 / 3)
         assert dis.matched_span[0] == 3.0
@@ -382,7 +382,7 @@ class TestMatchedSpans:
         c = tables.nodes.add_row(time=0, flags=1)
         tables.edges.add_row(parent=p, child=c, left=0, right=1)
         ts2 = tables.tree_sequence()
-        dis = tscompare.compare(ts1, ts2)
+        dis = tscompare.haplotype_arf(ts1, ts2)
         assert dis.arf == 1.0
         assert dis.tpr == 0.0
         assert dis.matched_span[0] == 0.0
@@ -406,7 +406,7 @@ class TestMatchedSpans:
         [(true_ext, true_ext), (true_simpl, true_ext), (true_simpl, true_unary)],
     )
     def test_zero_matched_span(self, pair):
-        dis = tscompare.compare(pair[0], pair[1])
+        dis = tscompare.haplotype_arf(pair[0], pair[1])
         assert np.isclose(dis.matched_span[0], dis.total_span[0])
         assert np.isclose(dis.arf, 0)
         assert np.isclose(dis.rmse, 0)
@@ -416,13 +416,13 @@ class TestMatchedSpans:
         [(true_ext, true_ext), (true_simpl, true_unary)],
     )
     def test_inverse_matched_span(self, pair):
-        dis = tscompare.compare(pair[1], pair[0])
+        dis = tscompare.haplotype_arf(pair[1], pair[0])
         assert np.isclose(dis.tpr, 1)
         assert np.isclose(dis.matched_span[1], dis.total_span[1])
 
     def test_transform(self):
-        dis1 = tscompare.compare(true_simpl, true_simpl, transform=lambda t: t)
-        dis2 = tscompare.compare(true_simpl, true_simpl, transform=None)
+        dis1 = tscompare.haplotype_arf(true_simpl, true_simpl, transform=lambda t: t)
+        dis2 = tscompare.haplotype_arf(true_simpl, true_simpl, transform=None)
         assert dis1.matched_span[0] == dis2.matched_span[0]
         assert dis1.rmse == dis2.rmse
         self.verify_compare(true_simpl, true_ext, transform=lambda t: 1 / (1 + t))
@@ -613,7 +613,7 @@ class TestMatchedSpans:
     def test_matched_span_value(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True)
-        dis = tscompare.compare(ts, other, transform=None)
+        dis = tscompare.haplotype_arf(ts, other, transform=None)
         assert np.isclose(dis.arf, 4 / 46)
         assert np.isclose(dis.total_span[0] - dis.matched_span[0], 4.0)
         assert np.isclose(dis.rmse, 0.0)
@@ -621,7 +621,7 @@ class TestMatchedSpans:
     def test_rmse(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(time=True)
-        dis = tscompare.compare(ts, other, transform=None)
+        dis = tscompare.haplotype_arf(ts, other, transform=None)
         true_total_span = 46
         assert dis.total_span[0] == true_total_span
         assert dis.total_span[1] == true_total_span
@@ -644,7 +644,7 @@ class TestMatchedSpans:
     def test_value_and_error(self):
         ts = self.get_simple_ts()
         other = self.get_simple_ts(span=True, time=True)
-        dis = tscompare.compare(ts, other, transform=None)
+        dis = tscompare.haplotype_arf(ts, other, transform=None)
         true_total_spans = (46, 47)
         assert dis.total_span == true_total_spans
 
@@ -667,7 +667,7 @@ class TestMatchedSpans:
     def test_extra_match(self):
         ts = self.get_simple_ts(extra_match=True)
         other = self.get_simple_ts()
-        dis = tscompare.compare(ts, other, transform=None)
+        dis = tscompare.haplotype_arf(ts, other, transform=None)
         n1_match_span = 7 * 6 + 2 * 2 + 2 * 4
         n2_match_span = 6 * 6 + 2 * 2 + 6
         true_spans = (54, 46)
@@ -719,7 +719,7 @@ class TestMatchedSpans:
     def test_n2_matching(self):
         ts = self.get_n2_match_ex()
         other = self.get_n2_match_ex(extra_nodes=True)
-        dis = tscompare.compare(ts, other, transform=None)
+        dis = tscompare.haplotype_arf(ts, other, transform=None)
         true_spans = (15, 18)
         match_spans = (15, 15)
         assert np.isclose(dis.arf, 1 - match_spans[0] / true_spans[0])
