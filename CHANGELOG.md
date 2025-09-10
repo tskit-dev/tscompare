@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.1] - 2025-XX-XX
+
+- Support Python3.10-3.13 ({pr}`24`)
+
 ## [0.2] - 2025-09-09
 
 Final release to go with publication of Fritze et al.
