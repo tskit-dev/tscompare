@@ -81,6 +81,7 @@ docs = [
     "msprime==1.3.4",
     "sphinx-book-theme",
     "numcodecs>=0.6,<0.15.1", #Pinned due to https://github.com/zarr-developers/numcodecs/issues/733
+    "setuptools_scm==9.2.0",
 ]
 dev = [
     "tskit",
