@@ -22,6 +22,7 @@
 """
 Tools for comparing node times between tree sequences with different node sets
 """
+
 import copy
 import warnings
 from collections import defaultdict

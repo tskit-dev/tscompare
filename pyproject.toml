@@ -31,7 +31,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -42,10 +41,9 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: MacOS",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "numpy>=1.21.0",
-    "tskit>=0.5.0",
+    "tskit>=1.0.0",
     "scipy>=1.7.0",
 ]
 
@@ -64,20 +62,15 @@ test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
-    "scipy",
 ]
 docs = [
-    "breathe",
-    "jupyter-book",
+    "jupyter-book<2",
     "msprime",
-    "numcodecs>=0.6,<0.15.1",  # Pinned due to https://github.com/zarr-developers/numcodecs/issues/733
     "sphinx-argparse",
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
     "sphinx-issues",
-    "setuptools_scm",
-    "svgwrite",
     "tsinfer",
 ]
 lint = [
@@ -108,9 +101,18 @@ testpaths = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 89
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "W", "I", "N", "UP", "A", "PT"]
 fixable = ["ALL"]
+
+ignore = [
+    "A001", "A002", "RUF",
+    "B905", #Don't add strict=False to zips (B905)
+    "E741", # using 'l' as a variable name
+    "N806", "N802", "N803", # Various nags about uppercase vars
+    "PT030", # `pytest.warns(DeprecationWarning)` is too broad.
+]
+
