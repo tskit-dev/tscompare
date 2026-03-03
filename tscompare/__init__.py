@@ -22,6 +22,7 @@
 """
 Tools for comparing tree sequences
 """
+
 from .methods import ARFResult  # noqa F401
 from .methods import CladeMap  # noqa F401
 from .methods import compare  # noqa F401

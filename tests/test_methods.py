@@ -23,6 +23,7 @@
 """
 Test tools for mapping between node sets of different tree sequences
 """
+
 from collections import defaultdict
 from itertools import combinations
 
@@ -197,7 +198,6 @@ class TestCladeMap:
 
 
 class TestNodeMatching:
-
     def test_empty_ts(self):
         ts = tskit.TableCollection(sequence_length=1.0).tree_sequence()
         x = tscompare.node_spans(ts)
@@ -261,7 +261,6 @@ class TestNodeMatching:
 
 
 class TestDeprecation:
-
     @pytest.mark.filterwarnings("ignore:invalid value encountered in scalar divide")
     def test_compare(self):
         ts = tskit.TableCollection(sequence_length=1.0).tree_sequence()
@@ -270,7 +269,6 @@ class TestDeprecation:
 
 
 class TestMatchedSpans:
-
     def verify_compare(self, ts, other, transform=None):
         match_n1_span, match_n2_span, ts_span, other_span, rmse = naive_compare(
             ts,
