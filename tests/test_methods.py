@@ -246,7 +246,7 @@ class TestNodeMatching:
         # 0.00┊ 0 1 ┊
         #     0     1
         ts = tskit.Tree.generate_star(2).tree_sequence
-        tables = ts.tables
+        tables = ts.dump_tables()
         tables.edges.clear()
         tables.edges.add_row(parent=2, child=0, left=0, right=1)
         empty_ts = tables.tree_sequence()
@@ -364,7 +364,7 @@ class TestMatchedSpans:
         # 0.00┊ 0 1 ┊
         #     0     1
         ts = tskit.Tree.generate_star(2).tree_sequence
-        tables = ts.tables
+        tables = ts.dump_tables()
         tables.edges.clear()
         tables.edges.add_row(parent=2, child=0, left=0, right=1)
         empty_ts = tables.tree_sequence()
