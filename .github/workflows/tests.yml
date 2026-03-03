@@ -7,36 +7,16 @@ on:
   merge_group:
 
 jobs:
-  pre-commit:
-    name: Lint
-    uses: tskit-dev/.github/.github/workflows/lint.yml@v2
-
   test:
     name: Python
-    runs-on: ${{ matrix.os }}
+    uses: tskit-dev/.github/.github/workflows/python-tests.yml@v13
+    with:
+      os: ${{ matrix.os }}
+      python-version: ${{ matrix.python }}
+      pyproject-directory: .
+      coverage-directory: tscompare
+    secrets: inherit
     strategy:
       matrix:
-        python-version: [ "3.10", "3.13" ]
-        os:  [ macos-latest, ubuntu-24.04, windows-latest ]
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.12.1
-        with:
-          access_token: ${{ github.token }}
-      - uses: actions/checkout@v4.2.2
-      - name: Install uv and set the python version
-        uses: astral-sh/setup-uv@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-          version: "0.8.15"
-      
-      - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -e ".[test]"
-      - name: Test with pytest
-        run: |
-          uv run --no-sync python -m pytest --cov=tscompare --cov-report=xml --cov-branch -n 0 tests
+        python: ["3.10", "3.13"]
+        os: [macos-latest, ubuntu-24.04, windows-latest]
