@@ -7,3 +7,6 @@ parts:
   - file: api
   - file: CITATION
   - file: CHANGELOG
+- caption: Development
+  chapters:
+  - file: development
