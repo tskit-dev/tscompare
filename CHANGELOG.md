@@ -1,4 +1,7 @@
 # Changelog
+## [0.2.2] - 2026-XX-XX
+
+In development
 
 ## [0.2.1] - 2026-03-05
 
