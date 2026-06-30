@@ -8,6 +8,6 @@ jobs:
   packaging:
     permissions:
       contents: read
-    uses: tskit-dev/.github/.github/workflows/python-packaging.yml@v18
+    uses: tskit-dev/.github/.github/workflows/python-packaging.yml@v19
     with:
       pyproject-directory: .
