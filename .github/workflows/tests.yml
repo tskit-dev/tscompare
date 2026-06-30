@@ -11,16 +11,14 @@ jobs:
     name: Python
     permissions:
       contents: read
-    # The tskit-dev reusable python-tests workflow consumes
-    # secrets.CODECOV_TOKEN without declaring it under workflow_call.secrets,
-    # so it can only be provided via `secrets: inherit`.
-    uses: tskit-dev/.github/.github/workflows/python-tests.yml@v17  # zizmor: ignore[secrets-inherit]
+    uses: tskit-dev/.github/.github/workflows/python-tests.yml@v19
     with:
       os: ${{ matrix.os }}
       python-version: ${{ matrix.python }}
       pyproject-directory: .
       coverage-directory: tscompare
-    secrets: inherit
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     strategy:
       matrix:
         python: ["3.11", "3.13"]
