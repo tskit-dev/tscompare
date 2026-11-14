@@ -278,12 +278,15 @@ def match_node_ages(ts, other):
 
         Returns a tuple of three vectors of length `ts.num_nodes`, in this order:
         the age of the best matching node in `other`;
-        the proportion of the node span in `ts` that is covered by the best match;
+        the shared span with the best match, in sequence-length units;
         and the node id of the best match in `other`.
 
+        To obtain the proportion of the node span in `ts` that is covered by the
+        best match, divide the shared span by the corresponding value from
+        :func:`.node_spans` (using ``include_missing=True``).
 
     :return: A tuple of arrays of length `ts.num_nodes` containing
-        (time of matching node, proportion overlap, and node ID of match).
+        (time of matching node, shared span, and node ID of match).
     """
 
     shared_spans = shared_node_spans(ts, other)
