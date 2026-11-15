@@ -278,7 +278,7 @@ def match_node_ages(ts, other):
 
         Returns a tuple of three vectors of length `ts.num_nodes`, in this order:
         the age of the best matching node in `other`;
-        the shared span with the best match, in sequence-length units;
+        the shared span with the best match, in units of sequence length;
         and the node id of the best match in `other`.
 
         To obtain the proportion of the node span in `ts` that is covered by the
